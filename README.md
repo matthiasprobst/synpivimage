@@ -1,2 +1,2 @@
 # synpivimage
-Too to build synthetic Particle Image Velocimetry (PIV) images
+Tool to build synthetic Particle Image Velocimetry (PIV) images

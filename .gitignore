@@ -1,0 +1,41 @@
+# build
+*.egg*
+build/
+dist/
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# pyCharm project setting
+.idea
+.idea/
+
+# macOS DS indices
+.DS_STORE
+Thumbs.db
+
+# testdata
+testdata
+
+# debug data
+*.debug/
+*.debug
+
+# jupyter
+*.ipynb_checkpoints*
+
+# other file names
+*.tiff
+*.par
+*.pth
+*.h5
+*.yaml
+*.env
+*.xml
+*.iml
+*.pyc
+*-checkpoint.ipynb*
+*.nc
+*.hdf
+*.hdf5
