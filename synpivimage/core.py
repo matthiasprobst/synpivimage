@@ -4,10 +4,9 @@ import os
 import random
 import warnings
 from dataclasses import dataclass
-from datetime import datetime
 from math import ceil
 from pathlib import Path
-from typing import Dict, List, Union, Tuple, Sequence
+from typing import Dict, List, Union, Tuple
 
 import h5py
 import numpy as np
@@ -269,29 +268,6 @@ def particle_intensity(z: np.ndarray, q: float, dz0: float, s: int):
     return q * np.exp(-1 / np.sqrt(2 * np.pi) * np.abs(2 * z ** 2 / dz0 ** 2) ** s)
 
 
-# def imwrite(fpath, arr, bit_depth):
-#     if isinstance(arr, xr.DataArray):
-#         _arr = arr.values
-#     else:
-#         _arr = arr
-#     tifffile.imwrite(fpath, _arr.astype('uint16'))
-
-
-def save_dataset(path, intensity, particle_data):
-    """writes a xarray Dataset to file (nc)"""
-    now = datetime.now()
-    dt_string = now.strftime('%Y-%m-%d_%H:%M:%S')
-    dset = xr.Dataset({'intensity': intensity,
-                       'particle_xpos': xr.DataArray(dims='particle_index', data=particle_data['x']),
-                       'particle_ypos': xr.DataArray(dims='particle_index', data=particle_data['y']),
-                       'particle_zpos': xr.DataArray(dims='particle_index', data=particle_data['z']),
-                       'particle_size': xr.DataArray(dims='particle_index', data=particle_data['size']),
-                       'particle_intensity': xr.DataArray(dims='particle_index', data=particle_data['intensity'])})
-    dset.attrs = {'code_source': 'https://git.scc.kit.edu/da4323/piv-particle-density',
-                  'code_version': __version__, 'creation_time': dt_string}
-    dset.to_netcdf(path)
-
-
 def _generate_images_and_store_to_nc(cfg: Dict, n: int,
                                      data_directory: Union[str, bytes, os.PathLike]) -> None:
     _data_dir = Path(data_directory)
@@ -350,47 +326,6 @@ def _generate(cfgs: List[Dict], nproc: int) -> Tuple[np.ndarray, List[Dict]]:
                 intensities[i, ...] = intensity
                 particle_information.append(particle_meta)
             return intensities, particle_information
-
-
-def generate_and_write_images(cfg: Union[List[Dict], Dict], n: int,
-                              data_directory: Union[str, bytes, os.PathLike],
-                              nproc: int = CPU_COUNT) -> None:
-    """Generates the image(s) according to the configuration(s) and returns raw data
-    or writes data directly to a netCDF4 file
-
-    Parameters
-    ----------
-    cfg: List[Dict] or Dict
-        List of configuration dictionaries or a single config dictionary.
-    n: int
-        Number of re-runs of the provided configuration.
-    data_directory: Union[str, bytes, os.PathLike]
-        Directory path where to write data to.
-    nproc: int, default=CPU_COUNT
-        Number of processors to take for multiprocessing.
-
-    """
-    if nproc > CPU_COUNT:
-        warnings.warn('The number of processors you provided is larger than the '
-                      f'maximum of your computer. Will continue with {CPU_COUNT} processors instead.')
-        _nproc = CPU_COUNT
-    else:
-        _nproc = nproc
-
-    if isinstance(cfg, dict):
-        _generate_images_and_store_to_nc(cfg, data_directory)
-        return
-
-    if _nproc < 2:
-        for _cfg in tqdm(cfg):
-            _generate_images_and_store_to_nc(_cfg, data_directory)
-    else:
-        with mp.Pool(processes=_nproc) as pool:
-            results = [pool.apply_async(_generate_images_and_store_to_nc, args=(_cfg, data_directory)) for _cfg in
-                       cfg]
-
-            for r in tqdm(results):
-                _ = r.get()
 
 
 @dataclass
