@@ -1,11 +1,13 @@
+import itertools
 import multiprocessing as mp
 import os
+import random
 import warnings
 from dataclasses import dataclass
 from datetime import datetime
 from math import ceil
 from pathlib import Path
-from typing import Dict, List, Union, Tuple
+from typing import Dict, List, Union, Tuple, Sequence
 
 import h5py
 import numpy as np
@@ -24,12 +26,13 @@ default_yaml_file = 'default.yaml'
 PMIN_ALLOWED = 0.1
 
 DEFAULT_CFG = {'ny': 128, 'nx': 128, 'bit_depth': 16,
-                  'noise_baseline': 20, 'dark_noise': 2.29,
-                  'sensitivity': 1, 'qe': 1, 'shot_noise': True,
-                  'particle_number': 0.1, 'particle_size_mean': 2.5,
-                  'particle_size_std': 0.25,
-                  'laser_width': 3, 'laser_shape_factor': 4
-                  }
+               'noise_baseline': 20, 'dark_noise': 2.29,
+               'sensitivity': 1, 'qe': 1, 'shot_noise': True,
+               'particle_number': 0.1, 'particle_size_mean': 2.5,
+               'particle_size_std': 0.25,
+               'laser_width': 3, 'laser_shape_factor': 4,
+               'laser_max_intensity': 1000
+               }
 
 
 def write_yaml_file(filename: Union[str, bytes, os.PathLike], data: dict):
@@ -391,7 +394,7 @@ def generate_and_write_images(cfg: Union[List[Dict], Dict], n: int,
 
 
 @dataclass
-class Configurations:
+class ConfigManager:
     """Configuration class which manages creation of images and labels from one or multiple configurations"""
     cfgs: Dict
 
@@ -405,12 +408,12 @@ class Configurations:
     def __len__(self):
         return len(self.cfgs)
 
-    def generate(self, n: int, nproc: int = CPU_COUNT) -> Tuple[np.ndarray, np.ndarray]:
+    def generate(self, nproc: int = CPU_COUNT) -> Tuple[np.ndarray, np.ndarray]:
         """returns the generated data (intensities and particle information)
         This will not return all particle image information. Only number of particles!"""
         return _generate(self.cfgs, nproc)
 
-    def to_hdf(self, n: int, data_directory: Union[str, bytes, os.PathLike],
+    def to_hdf(self, data_directory: Union[str, bytes, os.PathLike],
                overwrite: bool = False, nproc: int = CPU_COUNT,
                compression: str = 'gzip', compression_opts: int = 5,
                n_split: int = 10000) -> List[Path]:
@@ -429,8 +432,6 @@ class Configurations:
 
         Parameters
         ----------
-        n: int
-            Number of datasets per parameter
         data_directory: str, bytes, os.PathLike
             Path to directory where HDF5 files should be stored.
         overwrite: bool, default=False
@@ -466,12 +467,11 @@ class Configurations:
 
         if n_split is None:
             _nfiles = 1
-            chunked_cfgs = [self.cfgs * n, ]
+            chunked_cfgs = [self.cfgs, ]
         else:
-            chunked_cfgs = _chunk(self.cfgs * n, n_split)
-            _nfiles = ceil(len(self.cfgs) / n_split * n)
-        print('Writing HDF5 file(s). This may take a while... '
-              f'(files to write: {_nfiles}. datasets to write in total: {len(self.cfgs * n)})')
+            chunked_cfgs = _chunk(self.cfgs, n_split)
+            _nfiles = ceil(len(self.cfgs) / n_split)
+        print(f'Writing {len(self.cfgs)} dataset into {_nfiles} HDF5 file(s). This may take a while...')
 
         filenames = []
         for ichunk, cfg_chunk in enumerate(chunked_cfgs):
@@ -506,37 +506,55 @@ class Configurations:
                 print('... done.')
         return filenames
 
-    def to_nc(self, n: int, data_directory: Union[str, bytes, os.PathLike], nproc=CPU_COUNT) -> None:
-        """Generates the image(s) according to the configuration(s) and returns raw data
-        or writes data directly to a netCDF4 file
 
-        Parameters
-        ----------
-        n: int
-            Number of re-runs of the provided configuration.
-        data_directory: Union[str, bytes, os.PathLike]
-            Directory path where to write data to.
-        nproc: int, default=CPU_COUNT
-            Number of processors to take for multiprocessing.
+def build_ConfigManager(initial_cfg: Dict,
+                        variations: List[Tuple[str, Union[float, np.ndarray, Tuple]]],
+                        per_combination: int = 1, shuffle: bool = True) -> ConfigManager:
+    """Generates a list of configuration dictionaries.
+    Request an initial configuration and a tuple of variable length containing
+    the name of a dictionary key of the configuraiton and the values to be chosen.
+    A list containing configuration dictionaries of all combinations is
+    returned. Moreover, a filename is generated and added to the dictionary.
 
-        """
-        if nproc > CPU_COUNT:
-            warnings.warn('The number of processors you provided is larger than the '
-                          f'maximum of your computer. Will continue with {CPU_COUNT} processors instead.')
-            _nproc = CPU_COUNT
-        else:
-            _nproc = nproc
+    Parameters
+    ----------
+    initial_cfg : Dict
+        Initial configuration to take and replace parameters to vary in
+    variations: List
+        List of Tuples describing what to vary. An entry in the list
+        must look like ('parameter_name', [1, 2, 3])
+    per_combination: int=1
+        Number of configurations per parameter set (It may be useful to repeat
+        the generation of a specific parameter set because particles are randomly
+        generated. Default is 1.
+    shuffle: bool=True
+        Shuffle the config files. Default is True.
 
-        if _nproc < 2:
-            for _cfg in tqdm(self.cfgs):
-                _generate_images_and_store_to_nc(_cfg, data_directory)
-        else:
-            with mp.Pool(processes=_nproc) as pool:
-                results = [pool.apply_async(_generate_images_and_store_to_nc, args=(_cfg, data_directory)) for _cfg
-                           in self.cfgs]
+    """
 
-                for r in tqdm(results):
-                    _ = r.get()
+    variation_dict = {n: v for n, v in variations}
+
+    # if variation has a float entry, make it a list:
+    for k, v in variation_dict.items():
+        if isinstance(v, (int, float)):
+            variation_dict[k] = [v, ]
+
+    keys, values = zip(*variation_dict.items())
+    _dicts = [dict(zip(keys, v)) for v in itertools.product(*values)]
+
+    cfgs = []
+    count = 0
+    for _, param_dict in enumerate(_dicts):
+        for icomb in range(per_combination):
+            cfgs.append(initial_cfg.copy())
+            for k, v in param_dict.items():
+                cfgs[-1][k] = v
+                # a a raw filename without extension to the dictionary:
+            cfgs[-1]['fname'] = f'ds{count:06d}'
+            count += 1
+    if shuffle:
+        random.shuffle(cfgs)
+    return ConfigManager(cfgs)
 
 
 if __name__ == '__main__':
