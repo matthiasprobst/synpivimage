@@ -414,30 +414,61 @@ class ConfigManager:
             new_name = f'ds_{ichunk:06d}.hdf'
             new_filename = _dir.joinpath(new_name)
             filenames.append(new_filename)
-            n_ds = images.shape[0]
+            n_ds, ny, nx = images.shape
             with h5py.File(new_filename, 'w') as h5:
+                ds_imageindex = h5.create_dataset('image_index', data=np.arange(0, n_ds, 1), dtype=int)
+                ds_imageindex.attrs['long_name'] = 'image index'
+                ds_imageindex.make_scale()
+
+                ds_x_pixel_coord = h5.create_dataset('ix', data=np.arange(0, ny, 1), dtype=int)
+                ds_x_pixel_coord.attrs['standard_name'] = 'x_pixel_coordinate'
+                ds_x_pixel_coord.attrs['units'] = 'px'
+                ds_x_pixel_coord.make_scale()
+
+                ds_y_pixel_coord = h5.create_dataset('iy', data=np.arange(0, nx, 1), dtype=int)
+                ds_y_pixel_coord.attrs['standard_name'] = 'y_pixel_coordinate'
+                ds_y_pixel_coord.attrs['units'] = 'px'
+                ds_y_pixel_coord.make_scale()
+
                 ds_images = h5.create_dataset('image', shape=images.shape, compression=compression,
                                               compression_opts=compression_opts,
                                               chunks=(1, *images.shape[1:]))
+                ds_images.attrs['long_name'] = 'image intensities'
+
                 ds_nparticles = h5.create_dataset('nparticles', shape=n_ds,
                                                   compression=compression,
-                                                  compression_opts=compression_opts)
+                                                  compression_opts=compression_opts, dtype=int)
+                ds_nparticles.attrs['long_name'] = 'number of particles'
+                ds_nparticles.attrs['units'] = 'counts'
+
                 ds_mean_size = h5.create_dataset('particle_size_mean', shape=n_ds, compression=compression,
                                                  compression_opts=compression_opts)
+                ds_mean_size.attrs['units'] = 'px'
+
                 ds_std_size = h5.create_dataset('particle_size_std', shape=n_ds, compression=compression,
                                                 compression_opts=compression_opts)
+                ds_std_size.attrs['units'] = 'px'
+
                 ds_intensity_mean = h5.create_dataset('particle_intensity_mean', shape=n_ds, compression=compression,
                                                       compression_opts=compression_opts)
+                ds_intensity_mean.attrs['units'] = 'counts'
+
                 ds_intensity_std = h5.create_dataset('particle_intensity_std', shape=n_ds, compression=compression,
                                                      compression_opts=compression_opts)
-                ds_nparticles.attrs['long_name'] = 'number of particles'
-                ds_images.attrs['long_name'] = 'image intensities'
+                ds_intensity_std.attrs['units'] = 'counts'
+
                 ds_images[:] = images
                 ds_nparticles[:] = [len(p['x']) for p in particle_information]
                 ds_mean_size[:] = [np.mean(p['size']) for p in particle_information]
                 ds_std_size[:] = [np.std(p['size']) for p in particle_information]
                 ds_intensity_mean[:] = [np.mean(p['intensity']) for p in particle_information]
                 ds_intensity_std[:] = [np.std(p['intensity']) for p in particle_information]
+
+                for ds in (ds_images, ds_nparticles, ds_mean_size, ds_std_size,
+                           ds_intensity_mean, ds_intensity_std):
+                    ds.dims[0].attach_scale(ds_imageindex)
+                ds_images.dims[1].attach_scale(ds_y_pixel_coord)
+                ds_images.dims[2].attach_scale(ds_x_pixel_coord)
                 print('... done.')
         return filenames
 
