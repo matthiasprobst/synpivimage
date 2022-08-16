@@ -1,7 +1,7 @@
 try:
     from importlib.metadata import version as _version
 
-    __version__ = _version('pivparticledensity')
+    __version__ = _version('synpivimage')
 except ImportError:
     import warnings
 
