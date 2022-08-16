@@ -12,7 +12,7 @@ import h5py
 import numpy as np
 import xarray as xr
 import yaml
-from tqdm.notebook import tqdm
+from tqdm import tqdm
 
 from ._version import __version__
 from .noise import add_camera_noise

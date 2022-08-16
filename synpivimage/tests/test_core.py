@@ -1,7 +1,16 @@
 import numpy as np
 
 from synpivimage import DEFAULT_CFG
+from synpivimage import __version__
 from synpivimage import build_ConfigManager
+
+
+def test_version():
+    try:
+        from importlib.metadata import version as _version
+        assert __version__ == '0.1.3'
+    except ImportError:
+        assert __version__ == '999'
 
 
 def test_build_config_manager():
@@ -12,7 +21,7 @@ def test_build_config_manager():
     CFG = build_ConfigManager(cfg, [particle_number_range, ], per_combination=1)
     assert len(CFG) == 101
     CFG = build_ConfigManager(cfg, [particle_number_range, ], per_combination=2)
-    assert len(CFG) == 101*2
+    assert len(CFG) == 101 * 2
 
     generated_particle_number = [cfg['particle_number'] for cfg in CFG.cfgs]
     assert np.array_equal(np.unique(np.sort(generated_particle_number)), particle_number_range[1])
