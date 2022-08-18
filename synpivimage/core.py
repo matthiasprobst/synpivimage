@@ -433,7 +433,7 @@ class ConfigManager:
                 ds_images = h5.create_dataset('image', shape=images.shape, compression=compression,
                                               compression_opts=compression_opts,
                                               chunks=(1, *images.shape[1:]))
-                ds_images.attrs['long_name'] = 'image intensities'
+                ds_images.attrs['long_name'] = 'image intensity'
 
                 ds_nparticles = h5.create_dataset('nparticles', shape=n_ds,
                                                   compression=compression,
@@ -464,9 +464,13 @@ class ConfigManager:
                 ds_intensity_mean[:] = [np.mean(p['intensity']) for p in particle_information]
                 ds_intensity_std[:] = [np.std(p['intensity']) for p in particle_information]
 
-                for ds in (ds_images, ds_nparticles, ds_mean_size, ds_std_size,
+                for ds in (ds_nparticles, ds_mean_size, ds_std_size,
                            ds_intensity_mean, ds_intensity_std):
-                    ds.dims[0].attach_scale(ds_imageindex)
+                    ds.make_scale()
+
+                for ids, ds in enumerate((ds_imageindex, ds_nparticles, ds_mean_size, ds_std_size,
+                                         ds_intensity_mean, ds_intensity_std)):
+                    ds_images.dims[0].attach_scale(ds)
                 ds_images.dims[1].attach_scale(ds_y_pixel_coord)
                 ds_images.dims[2].attach_scale(ds_x_pixel_coord)
                 print('... done.')
