@@ -24,9 +24,10 @@ default_yaml_file = 'default.yaml'
 
 PMIN_ALLOWED = 0.1
 
+# default config has no noise since it can be added afterwards, too
 DEFAULT_CFG = {'ny': 128, 'nx': 128, 'bit_depth': 16,
-               'noise_baseline': 20, 'dark_noise': 2.29,
-               'sensitivity': 1, 'qe': 1, 'shot_noise': True,
+               'noise_baseline': 0.0, 'dark_noise': 0.0,  # 'noise_baseline': 20, 'dark_noise': 2.29,
+               'sensitivity': 1, 'qe': 1, 'shot_noise': False,
                'particle_number': 0.1, 'particle_size_mean': 2.5,
                'particle_size_std': 0.25,
                'laser_width': 3, 'laser_shape_factor': 4,
@@ -173,8 +174,11 @@ def generate_image(config_or_yaml: Dict or str, particle_data: dict = None, **kw
         _intensity[ymin:ymax, xmin:xmax] += np.exp(-8 * squared_dist / psize ** 2) * pint
 
     # add noise (pass the number of photons! That's why multiplication with sensitivity)
-    _intensity = add_camera_noise(_intensity / sensitivity, qe=qe, sensitivity=sensitivity,
-                                  dark_noise=dark_noise, baseline=baseline, enable_shot_noise=shot_noise_enabled)
+    if dark_noise == 0. and not shot_noise_enabled and baseline == 0.:
+        pass  # add NO noise
+    else:
+        _intensity = add_camera_noise(_intensity / sensitivity, qe=qe, sensitivity=sensitivity,
+                                      dark_noise=dark_noise, baseline=baseline, enable_shot_noise=shot_noise_enabled)
 
     max_adu = np.int(2 ** bit_depth - 1)
     _saturated_pixels = _intensity > max_adu
@@ -469,7 +473,7 @@ class ConfigManager:
                     ds.make_scale()
 
                 for ids, ds in enumerate((ds_imageindex, ds_nparticles, ds_mean_size, ds_std_size,
-                                         ds_intensity_mean, ds_intensity_std)):
+                                          ds_intensity_mean, ds_intensity_std)):
                     ds_images.dims[0].attach_scale(ds)
                 ds_images.dims[1].attach_scale(ds_y_pixel_coord)
                 ds_images.dims[2].attach_scale(ds_x_pixel_coord)
