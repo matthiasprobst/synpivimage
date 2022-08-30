@@ -29,8 +29,9 @@ DEFAULT_CFG = {'ny': 128, 'nx': 128, 'bit_depth': 16,
                'sensitivity': 1, 'qe': 1, 'shot_noise': False,
                'particle_number': 0.1, 'particle_size_mean': 2.5,
                'particle_size_std': 0.25,
-               'laser_width': 3, 'laser_shape_factor': 4,
-               'laser_max_intensity': 1000
+               'laser_width': 3, 'laser_shape_factor': 2,
+               'sensor_gain': 1.0  # a particle hit by max laser intensity will show max count on the sensor
+               # 'laser_max_intensity': 1000
                }
 
 
@@ -132,7 +133,7 @@ def generate_image(config_or_yaml: Dict or str, particle_data: dict = None, **kw
 
     ppp = n_particles / image_size  # real ppp
 
-    q = config['laser_max_intensity']
+    q = 2 ** bit_depth * config['sensor_gain']
     dz0 = config['laser_width']
     s = config['laser_shape_factor']
 
@@ -207,12 +208,11 @@ def generate_image(config_or_yaml: Dict or str, particle_data: dict = None, **kw
              'laser_width': dz0,
              'laser_shape_factor': s,
              'laser_max_intensity': q,
+             'sensor_gain': config['sensor_gain'],
              'code_source': 'https://git.scc.kit.edu/da4323/piv-particle-density',
              'version': __version__}
 
-    image_data_array = xr.DataArray(name='intensity', dims=('y', 'x'), data=_intensity.astype(int),
-                                    attrs=attrs)
-    return image_data_array, {'x': xp, 'y': yp, 'z': zp, 'size': psizes, 'intensity': part_intensity}
+    return _intensity.astype(int), attrs, {'x': xp, 'y': yp, 'z': zp, 'size': psizes, 'intensity': part_intensity}
 
 
 def combine_particle_image_data_arrays(datasets: List[xr.DataArray]) -> xr.DataArray:
@@ -321,23 +321,28 @@ def _generate(cfgs: List[Dict], nproc: int) -> Tuple[np.ndarray, List[Dict]]:
         _nproc = nproc
 
     intensities = np.empty(shape=(len(cfgs), cfgs[0]['ny'], cfgs[0]['nx']))
+    # intensities = xr.DataArray(name='intensity', dims=('y', 'x'),
+    #                            data=np.empty(shape=(len(cfgs), cfgs[0]['ny'], cfgs[0]['nx'])))
     particle_information = []
+    attrs_ls = []
     if _nproc < 2:
         idx = 0
         for _cfg in tqdm(cfgs, total=len(cfgs), unit='cfg dict'):
-            _intensity, _partpos = generate_image(_cfg)
+            _intensity, _attrs, _partpos = generate_image(_cfg)
             intensities[idx, ...] = _intensity
+            attrs_ls.append(_attrs)
             particle_information.append(len(_partpos['x']))
             idx += 1
-        return intensities, particle_information
+        return intensities, attrs_ls, particle_information
     else:
         with mp.Pool(processes=_nproc) as pool:
             results = [pool.apply_async(generate_image, args=(_cfg,)) for _cfg in cfgs]
             for i, r in tqdm(enumerate(results), total=len(results)):
-                intensity, particle_meta = r.get()
+                intensity, _attrs, particle_meta = r.get()
                 intensities[i, ...] = intensity
+                attrs_ls.append(_attrs)
                 particle_information.append(particle_meta)
-            return intensities, particle_information
+            return intensities, attrs_ls, particle_information
 
 
 @dataclass
@@ -422,7 +427,7 @@ class ConfigManager:
 
         filenames = []
         for ichunk, cfg_chunk in enumerate(chunked_cfgs):
-            images, particle_information = _generate(cfg_chunk, nproc)
+            images, attrs, particle_information = _generate(cfg_chunk, nproc)
             new_name = f'ds_{ichunk:06d}.hdf'
             new_filename = _dir.joinpath(new_name)
             filenames.append(new_filename)
@@ -454,28 +459,53 @@ class ConfigManager:
                                                   compression_opts=compression_opts, dtype=int)
                 ds_nparticles.attrs['long_name'] = 'number of particles'
                 ds_nparticles.attrs['units'] = ''
+                ds_nparticles.make_scale()
 
                 ds_particledens = h5.create_dataset('particle_density', shape=n_ds,
                                                     compression=compression,
                                                     compression_opts=compression_opts, dtype=float)
                 ds_particledens.attrs['long_name'] = 'particle density'
                 ds_particledens.attrs['units'] = '1/px'
+                ds_particledens.make_scale()
 
                 ds_mean_size = h5.create_dataset('particle_size_mean', shape=n_ds, compression=compression,
                                                  compression_opts=compression_opts)
                 ds_mean_size.attrs['units'] = 'px'
+                ds_mean_size.make_scale()
 
                 ds_std_size = h5.create_dataset('particle_size_std', shape=n_ds, compression=compression,
                                                 compression_opts=compression_opts)
                 ds_std_size.attrs['units'] = 'px'
+                ds_std_size.make_scale()
 
                 ds_intensity_mean = h5.create_dataset('particle_intensity_mean', shape=n_ds, compression=compression,
                                                       compression_opts=compression_opts)
                 ds_intensity_mean.attrs['units'] = 'counts'
+                ds_intensity_mean.make_scale()
 
                 ds_intensity_std = h5.create_dataset('particle_intensity_std', shape=n_ds, compression=compression,
                                                      compression_opts=compression_opts)
                 ds_intensity_std.attrs['units'] = 'counts'
+                ds_intensity_std.make_scale()
+
+                ds_n_satpx = h5.create_dataset('number_of_saturated_pixels', shape=n_ds, compression=compression,
+                                               compression_opts=compression_opts)
+                ds_n_satpx.attrs['units'] = 'counts'
+                ds_n_satpx.make_scale()
+
+                ds_laser_width = h5.create_dataset('laser_width', shape=n_ds, compression=compression,
+                                                   compression_opts=compression_opts)
+                ds_laser_width.attrs['units'] = 'm'
+                ds_laser_width.make_scale()
+
+                ds_laser_shape_factor = h5.create_dataset('laser_shape_factor', shape=n_ds, compression=compression,
+                                                          compression_opts=compression_opts)
+                ds_laser_shape_factor.attrs['units'] = ''
+                ds_laser_shape_factor.make_scale()
+
+                ds_n_satpx[:] = [a['n_saturated_pixels'] for a in attrs]
+                ds_laser_shape_factor[:] = [a['laser_shape_factor'] for a in attrs]
+                ds_laser_width[:] = [a['laser_width'] for a in attrs]
 
                 ds_images[:] = images
                 npart = np.asarray([len(p['x']) for p in particle_information])
@@ -486,12 +516,9 @@ class ConfigManager:
                 ds_intensity_mean[:] = [np.mean(p['intensity']) for p in particle_information]
                 ds_intensity_std[:] = [np.std(p['intensity']) for p in particle_information]
 
-                for ds in (ds_nparticles, ds_mean_size, ds_std_size,
-                           ds_intensity_mean, ds_intensity_std):
-                    ds.make_scale()
-
-                for ids, ds in enumerate((ds_imageindex, ds_nparticles, ds_mean_size, ds_std_size,
-                                          ds_intensity_mean, ds_intensity_std)):
+                for ds in (ds_imageindex, ds_nparticles, ds_mean_size, ds_std_size,
+                                          ds_intensity_mean, ds_intensity_std,
+                                          ds_laser_width, ds_laser_shape_factor, ds_n_satpx):
                     ds_images.dims[0].attach_scale(ds)
                 ds_images.dims[1].attach_scale(ds_y_pixel_coord)
                 ds_images.dims[2].attach_scale(ds_x_pixel_coord)
