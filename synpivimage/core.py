@@ -1,18 +1,17 @@
+import h5py
 import itertools
 import multiprocessing as mp
+import numpy as np
 import os
 import random
 import warnings
+import xarray as xr
+import yaml
 from dataclasses import dataclass
 from math import ceil
 from pathlib import Path
-from typing import Dict, List, Union, Tuple
-
-import h5py
-import numpy as np
-import xarray as xr
-import yaml
 from tqdm import tqdm
+from typing import Dict, List, Union, Tuple
 
 from ._version import __version__
 from .noise import add_camera_noise
@@ -152,7 +151,16 @@ def generate_image(config_or_yaml: Dict or str, particle_data: dict = None, **kw
             xp = np.random.random(n_particles) * image_shape[1]
             yp = np.random.random(n_particles) * image_shape[0]
         zp = np.random.random(n_particles) * zminmax * 2 - zminmax  # physical location in laser sheet! TODO: units??!!
-        psizes = np.clip(np.random.normal(pmean, pstd, n_particles), pmin, pmax)
+        # we should not clip the normal distribution
+        # psizes = np.clip(np.random.normal(pmean, pstd, n_particles), pmin, pmax)
+        # but rather redo the normal distbution for the outliers:
+        psizes = np.random.normal(pmean, pstd, n_particles)
+        iout = np.argwhere((psizes < pmin) | (psizes > pmax))
+        for i in iout[:, 0]:
+            dp = np.random.normal(pmean, pstd)
+            while dp < pmin or dp > pmax:
+                dp = np.random.normal(pmean, pstd)
+            psizes[i] = dp
 
     # illuminate:
     part_intensity = particle_intensity(zp, q, dz0, s)
@@ -422,6 +430,7 @@ class ConfigManager:
             with h5py.File(new_filename, 'w') as h5:
                 ds_imageindex = h5.create_dataset('image_index', data=np.arange(0, n_ds, 1), dtype=int)
                 ds_imageindex.attrs['long_name'] = 'image index'
+                ds_imageindex.attrs['units'] = ''
                 ds_imageindex.make_scale()
 
                 ds_x_pixel_coord = h5.create_dataset('ix', data=np.arange(0, ny, 1), dtype=int)
@@ -438,12 +447,19 @@ class ConfigManager:
                                               compression_opts=compression_opts,
                                               chunks=(1, *images.shape[1:]))
                 ds_images.attrs['long_name'] = 'image intensity'
+                ds_images.attrs['units'] = 'counts'
 
                 ds_nparticles = h5.create_dataset('nparticles', shape=n_ds,
                                                   compression=compression,
                                                   compression_opts=compression_opts, dtype=int)
                 ds_nparticles.attrs['long_name'] = 'number of particles'
-                ds_nparticles.attrs['units'] = 'counts'
+                ds_nparticles.attrs['units'] = ''
+
+                ds_particledens = h5.create_dataset('particle_density', shape=n_ds,
+                                                    compression=compression,
+                                                    compression_opts=compression_opts, dtype=float)
+                ds_particledens.attrs['long_name'] = 'particle density'
+                ds_particledens.attrs['units'] = '1/px'
 
                 ds_mean_size = h5.create_dataset('particle_size_mean', shape=n_ds, compression=compression,
                                                  compression_opts=compression_opts)
@@ -462,7 +478,9 @@ class ConfigManager:
                 ds_intensity_std.attrs['units'] = 'counts'
 
                 ds_images[:] = images
-                ds_nparticles[:] = [len(p['x']) for p in particle_information]
+                npart = np.asarray([len(p['x']) for p in particle_information])
+                ds_nparticles[:] = npart
+                ds_particledens[:] = npart / (nx * ny)
                 ds_mean_size[:] = [np.mean(p['size']) for p in particle_information]
                 ds_std_size[:] = [np.std(p['size']) for p in particle_information]
                 ds_intensity_mean[:] = [np.mean(p['intensity']) for p in particle_information]

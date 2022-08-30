@@ -11,7 +11,7 @@ from synpivimage import build_ConfigManager
 def test_version():
     try:
         from importlib.metadata import version as _version
-        assert __version__ == '0.1.8'
+        assert __version__ == '0.1.9'
     except ImportError:
         assert __version__ == '999'
 
