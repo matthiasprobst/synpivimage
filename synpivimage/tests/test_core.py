@@ -42,15 +42,15 @@ def test_to_hdf():
     CFG = build_ConfigManager(cfg, [particle_number_range, ], per_combination=1)
     CFG.to_hdf('.')
     with h5py.File('ds_000000.hdf') as h5:
-        assert 'image' in h5
+        assert 'images' in h5
         assert 'image_index' in h5
         for dsname in h5.keys():
             if isinstance(h5[dsname], h5py.Dataset) and dsname == 'images':
                 print(dsname)
                 assert h5[dsname].dims[0][0] == h5['image_index']
-                assert h5[dsname].dims[0][1] == h5['naparticle']
-        assert h5['image'].dims[1][0] == h5['iy']
-        assert h5['image'].dims[2][0] == h5['ix']
+                assert h5[dsname].dims[0][1] == h5['nparticles']
+        assert h5['images'].dims[1][0] == h5['iy']
+        assert h5['images'].dims[2][0] == h5['ix']
     if pathlib.Path('ds_000000.hdf').exists():
         pathlib.Path('ds_000000.hdf').unlink()
     # python3.8 only:
