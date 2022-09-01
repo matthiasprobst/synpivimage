@@ -16,6 +16,11 @@ from typing import Dict, List, Union, Tuple
 from ._version import __version__
 from .noise import add_camera_noise
 
+try:
+    from pivsig import standard_name_table
+    from h5rdmtoolbox.conventions import translations
+except ImportError as e:
+    print(e)
 np.random.seed()
 CPU_COUNT = mp.cpu_count()
 
@@ -24,7 +29,8 @@ default_yaml_file = 'default.yaml'
 PMIN_ALLOWED = 0.1
 
 # default config has no noise since it can be added afterwards, too
-DEFAULT_CFG = {'ny': 128, 'nx': 128, 'bit_depth': 16,
+DEFAULT_CFG = {'ny': 128, 'nx': 128, 'square_image': True,
+               'bit_depth': 16,
                'noise_baseline': 0.0, 'dark_noise': 0.0,  # 'noise_baseline': 20, 'dark_noise': 2.29,
                'sensitivity': 1, 'qe': 1, 'shot_noise': False,
                'particle_number': 0.1, 'particle_size_mean': 2.5,
@@ -74,6 +80,8 @@ def generate_image(config_or_yaml: Dict or str, particle_data: dict = None, **kw
         config = yaml2dict(config_or_yaml)
 
     # read and process configuration:
+    if config['square_image']:
+        config['ny'] = config['nx']
     image_shape = (config['ny'], config['nx'])
     image_size = image_shape[0] * image_shape[1]
 
@@ -319,7 +327,8 @@ def _generate(cfgs: List[Dict], nproc: int) -> Tuple[np.ndarray, List[Dict]]:
         _nproc = CPU_COUNT
     else:
         _nproc = nproc
-
+    if cfgs[0]['square_image']:
+        cfgs[0]['ny'] = cfgs[0]['nx']
     intensities = np.empty(shape=(len(cfgs), cfgs[0]['ny'], cfgs[0]['nx']))
     # intensities = xr.DataArray(name='intensity', dims=('y', 'x'),
     #                            data=np.empty(shape=(len(cfgs), cfgs[0]['ny'], cfgs[0]['nx'])))
@@ -331,7 +340,7 @@ def _generate(cfgs: List[Dict], nproc: int) -> Tuple[np.ndarray, List[Dict]]:
             _intensity, _attrs, _partpos = generate_image(_cfg)
             intensities[idx, ...] = _intensity
             attrs_ls.append(_attrs)
-            particle_information.append(len(_partpos['x']))
+            particle_information.append(_partpos)
             idx += 1
         return intensities, attrs_ls, particle_information
     else:
@@ -448,7 +457,7 @@ class ConfigManager:
                 ds_y_pixel_coord.attrs['units'] = 'px'
                 ds_y_pixel_coord.make_scale()
 
-                ds_images = h5.create_dataset('image', shape=images.shape, compression=compression,
+                ds_images = h5.create_dataset('images', shape=images.shape, compression=compression,
                                               compression_opts=compression_opts,
                                               chunks=(1, *images.shape[1:]))
                 ds_images.attrs['long_name'] = 'image intensity'
@@ -517,11 +526,15 @@ class ConfigManager:
                 ds_intensity_std[:] = [np.std(p['intensity']) for p in particle_information]
 
                 for ds in (ds_imageindex, ds_nparticles, ds_mean_size, ds_std_size,
-                                          ds_intensity_mean, ds_intensity_std,
-                                          ds_laser_width, ds_laser_shape_factor, ds_n_satpx):
+                           ds_intensity_mean, ds_intensity_std,
+                           ds_laser_width, ds_laser_shape_factor, ds_n_satpx,
+                           ds_particledens):
                     ds_images.dims[0].attach_scale(ds)
                 ds_images.dims[1].attach_scale(ds_y_pixel_coord)
                 ds_images.dims[2].attach_scale(ds_x_pixel_coord)
+
+                translations.translate_standard_names(h5, translation_dict=standard_name_table._translation_dict[
+                    'synpivimage'])
                 print('... done.')
         return filenames
 
