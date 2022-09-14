@@ -14,7 +14,7 @@ class TestCore(unittest.TestCase):
     def test_version(self):
         try:
             from importlib.metadata import version as _version
-            assert __version__ == '0.1.9'
+            assert __version__ == '0.1.10'
         except ImportError:
             assert __version__ == '999'
 
