@@ -1,24 +1,24 @@
-import h5py
 import itertools
 import multiprocessing as mp
-import numpy as np
 import os
+import pathlib
 import random
 import warnings
-import xarray as xr
-import yaml
 from dataclasses import dataclass
 from math import ceil
 from pathlib import Path
-from tqdm import tqdm
 from typing import Dict, List, Union, Tuple
+
+import h5py
+import numpy as np
+import yaml
+from tqdm import tqdm
 
 from ._version import __version__
 from .noise import add_camera_noise
 
 try:
-    from pivsig import standard_name_table
-    from h5rdmtoolbox.conventions import translations
+    from h5rdmtoolbox.conventions import StandardNameTable, StandardNameTableTranslation
 except ImportError as e:
     print(e)
 np.random.seed()
@@ -33,12 +33,42 @@ DEFAULT_CFG = {'ny': 128, 'nx': 128, 'square_image': True,
                'bit_depth': 16,
                'noise_baseline': 0.0, 'dark_noise': 0.0,  # 'noise_baseline': 20, 'dark_noise': 2.29,
                'sensitivity': 1, 'qe': 1, 'shot_noise': False,
-               'particle_number': 0.1, 'particle_size_mean': 2.5,
+               'particle_number': 1, 'particle_size_mean': 2.5,
                'particle_size_std': 0.25,
                'laser_width': 3, 'laser_shape_factor': 2,
-               'sensor_gain': 1.0  # a particle hit by max laser intensity will show max count on the sensor
+               'sensor_gain': 1.0,  # a particle hit by max laser intensity will show max count on the sensor
                # 'laser_max_intensity': 1000
+               'particle_position_file': None,
+               'particle_size_illumination_dependency': True
                }
+
+
+def particle_location_from_file(filename: str) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Read particle loaction from file. Expected content (not checked) is
+    comma separated with a header line
+    #x, y, z, dp
+     1, 0, 0, 2
+     2, 0, 0, 2
+     3, 1, 0, 2
+    """
+    posarr = np.genfromtxt(filename, delimiter=',')
+    xp = posarr[:, 0]
+    yp = posarr[:, 1]
+    zp = posarr[:, 2]
+    dp = posarr[:, 3]
+    return xp, yp, zp, dp
+
+
+def process_config_for_particle_position(cfg: Dict):
+    if cfg['particle_position_file'] is None:
+        return None
+    xp, yp, zp, dp = particle_location_from_file(cfg['particle_position_file'])
+    # update some config data:
+    cfg['particle_number'] = len(xp)
+    cfg['particle_size_mean'] = np.mean(dp)
+    cfg['particle_size_std'] = np.std(dp)
+    pposdict = dict(x=xp, y=yp, z=zp, size=dp)
+    return pposdict
 
 
 def write_yaml_file(filename: Union[str, bytes, os.PathLike], data: dict):
@@ -128,7 +158,11 @@ def generate_image(config_or_yaml: Dict or str, particle_data: dict = None, **kw
                     raise ValueError(f'particle information must be 1D and not {_arg.ndim}D: {_arg}')
             n_particles = xp.size
     else:
+        if config['particle_number'] < 1:
+            raise ValueError('Argument "particle_number" invalid. Must be an integer greater than 0: '
+                             f'{config["particle_number"]}')
         n_particles = int(config['particle_number'])
+        assert n_particles > 0
         pmean = config['particle_size_mean']  # mean particle size
         pstd = config['particle_size_std']  # standard deviation of particle size
         pmin = pmean - 3 * pstd  # min particle size is 3*sigma below mean psize
@@ -141,7 +175,7 @@ def generate_image(config_or_yaml: Dict or str, particle_data: dict = None, **kw
 
     ppp = n_particles / image_size  # real ppp
 
-    q = 2 ** bit_depth * config['sensor_gain']
+    q = 2 ** bit_depth
     dz0 = config['laser_width']
     s = config['laser_shape_factor']
 
@@ -172,7 +206,12 @@ def generate_image(config_or_yaml: Dict or str, particle_data: dict = None, **kw
             psizes[i] = dp
 
     # illuminate:
-    part_intensity = particle_intensity(zp, q, dz0, s)
+    if config['particle_size_illumination_dependency']:
+        part_intensity = particle_intensity(zp, dz0, s, dp=psizes)
+        part_intensity = part_intensity / (np.pi * max(psizes) ** 2 / 8)
+    else:
+        part_intensity = particle_intensity(zp, dz0, s)
+    part_intensity = part_intensity * q * config['sensor_gain']
     ny, nx = image_shape
     # nsigma = 4
     for x, y, z, psize, pint in zip(xp, yp, zp, psizes, part_intensity):
@@ -197,7 +236,7 @@ def generate_image(config_or_yaml: Dict or str, particle_data: dict = None, **kw
         _intensity = add_camera_noise(_intensity / sensitivity, qe=qe, sensitivity=sensitivity,
                                       dark_noise=dark_noise, baseline=baseline, enable_shot_noise=shot_noise_enabled)
 
-    max_adu = np.int(2 ** bit_depth - 1)
+    max_adu = int(2 ** bit_depth - 1)
     _saturated_pixels = _intensity > max_adu
     n_saturated_pixels = np.sum(_saturated_pixels)
 
@@ -209,13 +248,15 @@ def generate_image(config_or_yaml: Dict or str, particle_data: dict = None, **kw
              'noise_eq': qe,
              'noise_sensitivity': sensitivity,
              'n_saturated_pixels': n_saturated_pixels,
-             'ps_mean': np.mean(psizes),
-             'ps_std': np.std(psizes),
+             # 'ps_mean': np.mean(psizes),
+             # 'ps_std': np.std(psizes),
              'ppp': ppp,
              'n_particles': n_particles,
              'laser_width': dz0,
              'laser_shape_factor': s,
              'laser_max_intensity': q,
+             'particle_size_mean': config['particle_size_mean'],
+             'particle_size_std': config['particle_size_std'],
              'sensor_gain': config['sensor_gain'],
              'code_source': 'https://git.scc.kit.edu/da4323/piv-particle-density',
              'version': __version__}
@@ -223,34 +264,34 @@ def generate_image(config_or_yaml: Dict or str, particle_data: dict = None, **kw
     return _intensity.astype(int), attrs, {'x': xp, 'y': yp, 'z': zp, 'size': psizes, 'intensity': part_intensity}
 
 
-def combine_particle_image_data_arrays(datasets: List[xr.DataArray]) -> xr.DataArray:
-    """Combines the xr.DataArrays to a single DataArray"""
-    # _ = xr.DataArray(dims='image_index', data=np.arange(1, len(datasets) + 1))
-    ni = xr.DataArray(name='n_particles', dims='image_index', data=[d.n_particles for d in datasets])
-    ps_mean = xr.DataArray(name='ps_mean', dims='image_index', data=[d.ps_mean for d in datasets])
-    ps_std = xr.DataArray(name='ps_std', dims='image_index', data=[d.ps_std for d in datasets])
-    noise_baseline = xr.DataArray(name='noise_baseline', dims='image_index',
-                                  data=[d.noise_baseline for d in datasets])
-    noise_darknoise = xr.DataArray(name='dark_noise', dims='image_index',
-                                   data=[d.noise_darknoise for d in datasets])
-    n_saturated_pixels = xr.DataArray(name='n_saturated_pixels ', dims='image_index',
-                                      data=[d.n_saturated_pixels for d in datasets])
-
-    attrs = {k: v for k, v in datasets[0].attrs.items() if k not in ('n_particles', 'ps_mean',
-                                                                     'ps_std', 'noise_mean',
-                                                                     'noise_std', 'n_saturated_pixels',
-                                                                     'ppp')}
-
-    intensity = np.empty((len(datasets), *datasets[0].shape))
-    for i in range(len(datasets)):
-        intensity[i, ...] = datasets[i].values
-
-    return xr.DataArray(name='intensity', dims=('image_index', 'y', 'x'), data=intensity,
-                        coords={'ps_mean': ps_mean, 'ps_std': ps_std, 'n_particles': ni,
-                                'noise_baseline': noise_baseline,
-                                'noise_darknoise': noise_darknoise,
-                                'n_saturated_pixels': n_saturated_pixels},
-                        attrs=attrs)
+# def combine_particle_image_data_arrays(datasets: List[xr.DataArray]) -> xr.DataArray:
+#     """Combines the xr.DataArrays to a single DataArray"""
+#     # _ = xr.DataArray(dims='image_index', data=np.arange(1, len(datasets) + 1))
+#     ni = xr.DataArray(name='n_particles', dims='image_index', data=[d.n_particles for d in datasets])
+#     ps_mean = xr.DataArray(name='ps_mean', dims='image_index', data=[d.ps_mean for d in datasets])
+#     ps_std = xr.DataArray(name='ps_std', dims='image_index', data=[d.ps_std for d in datasets])
+#     noise_baseline = xr.DataArray(name='noise_baseline', dims='image_index',
+#                                   data=[d.noise_baseline for d in datasets])
+#     noise_darknoise = xr.DataArray(name='dark_noise', dims='image_index',
+#                                    data=[d.noise_darknoise for d in datasets])
+#     n_saturated_pixels = xr.DataArray(name='n_saturated_pixels ', dims='image_index',
+#                                       data=[d.n_saturated_pixels for d in datasets])
+#
+#     attrs = {k: v for k, v in datasets[0].attrs.items() if k not in ('n_particles', 'ps_mean',
+#                                                                      'ps_std', 'noise_mean',
+#                                                                      'noise_std', 'n_saturated_pixels',
+#                                                                      'ppp')}
+#
+#     intensity = np.empty((len(datasets), *datasets[0].shape))
+#     for i in range(len(datasets)):
+#         intensity[i, ...] = datasets[i].values
+#
+#     return xr.DataArray(name='intensity', dims=('image_index', 'y', 'x'), data=intensity,
+#                         coords={'ps_mean': ps_mean, 'ps_std': ps_std, 'n_particles': ni,
+#                                 'noise_baseline': noise_baseline,
+#                                 'noise_darknoise': noise_darknoise,
+#                                 'n_saturated_pixels': n_saturated_pixels},
+#                         attrs=attrs)
 
 
 def _compute_max_z_position_from_laser_properties(dz0: float, s: int) -> float:
@@ -267,25 +308,29 @@ def _compute_max_z_position_from_laser_properties(dz0: float, s: int) -> float:
                    1 / (2 * s))
 
 
-def particle_intensity(z: np.ndarray, q: float, dz0: float, s: int):
+def particle_intensity(z: np.ndarray, dz0: float, s: int, dp: np.ndarray = None):
     """Intensity of a particle in the laser beam.
+    Max intensity of laser is 1 in this function.
+    In previous versions this could be set. Now, the user has to take care of it him/herself
 
     Parameters
     ----------
     z : array-like
         particle z-position
-    q : float
-        laser max_intensity
     dz0 : float
         laser beam width. for 2 profile is gaussian
     s : int
         shape factor
     """
-    # Note: 0.5*dz0 because width is given not "distance to center"!
     if s == 0:
-        return q * np.ones_like(z)
-
-    return q * np.exp(-1 / np.sqrt(2 * np.pi) * np.abs(2 * z ** 2 / dz0 ** 2) ** s)
+        if dp is None:
+            return np.ones_like(z)
+        else:
+            return np.ones_like(z) * dp ** 2 * np.pi / 8
+    if dp is None:
+        return np.exp(-1 / np.sqrt(2 * np.pi) * np.abs(2 * z ** 2 / dz0 ** 2) ** s)
+    else:
+        return np.exp(-1 / np.sqrt(2 * np.pi) * np.abs(2 * z ** 2 / dz0 ** 2) ** s) * dp ** 2 * np.pi / 8
 
 
 def _generate_images_and_store_to_nc(cfg: Dict, n: int,
@@ -337,7 +382,9 @@ def _generate(cfgs: List[Dict], nproc: int) -> Tuple[np.ndarray, List[Dict]]:
     if _nproc < 2:
         idx = 0
         for _cfg in tqdm(cfgs, total=len(cfgs), unit='cfg dict'):
-            _intensity, _attrs, _partpos = generate_image(_cfg)
+            particle_data = process_config_for_particle_position(_cfg)
+
+            _intensity, _attrs, _partpos = generate_image(_cfg, particle_data=particle_data)
             intensities[idx, ...] = _intensity
             attrs_ls.append(_attrs)
             particle_information.append(_partpos)
@@ -345,7 +392,8 @@ def _generate(cfgs: List[Dict], nproc: int) -> Tuple[np.ndarray, List[Dict]]:
         return intensities, attrs_ls, particle_information
     else:
         with mp.Pool(processes=_nproc) as pool:
-            results = [pool.apply_async(generate_image, args=(_cfg,)) for _cfg in cfgs]
+            results = [pool.apply_async(generate_image, args=(_cfg, process_config_for_particle_position(_cfg))) for
+                       _cfg in cfgs]
             for i, r in tqdm(enumerate(results), total=len(results)):
                 intensity, _attrs, particle_meta = r.get()
                 intensities[i, ...] = intensity
@@ -447,12 +495,12 @@ class ConfigManager:
                 ds_imageindex.attrs['units'] = ''
                 ds_imageindex.make_scale()
 
-                ds_x_pixel_coord = h5.create_dataset('ix', data=np.arange(0, ny, 1), dtype=int)
+                ds_x_pixel_coord = h5.create_dataset('ix', data=np.arange(0, nx, 1), dtype=int)
                 ds_x_pixel_coord.attrs['standard_name'] = 'x_pixel_coordinate'
                 ds_x_pixel_coord.attrs['units'] = 'px'
                 ds_x_pixel_coord.make_scale()
 
-                ds_y_pixel_coord = h5.create_dataset('iy', data=np.arange(0, nx, 1), dtype=int)
+                ds_y_pixel_coord = h5.create_dataset('iy', data=np.arange(0, ny, 1), dtype=int)
                 ds_y_pixel_coord.attrs['standard_name'] = 'y_pixel_coordinate'
                 ds_y_pixel_coord.attrs['units'] = 'px'
                 ds_y_pixel_coord.make_scale()
@@ -482,10 +530,22 @@ class ConfigManager:
                 ds_mean_size.attrs['units'] = 'px'
                 ds_mean_size.make_scale()
 
+                ds_configured_mean_size = h5.create_dataset('configured_particle_size_mean', shape=n_ds,
+                                                            compression=compression,
+                                                            compression_opts=compression_opts)
+                ds_configured_mean_size.attrs['units'] = 'px'
+                ds_configured_mean_size.make_scale()
+
                 ds_std_size = h5.create_dataset('particle_size_std', shape=n_ds, compression=compression,
                                                 compression_opts=compression_opts)
                 ds_std_size.attrs['units'] = 'px'
                 ds_std_size.make_scale()
+
+                ds_configured_std_size = h5.create_dataset('configured_particle_size_std', shape=n_ds,
+                                                           compression=compression,
+                                                           compression_opts=compression_opts)
+                ds_configured_std_size.attrs['units'] = 'px'
+                ds_configured_std_size.make_scale()
 
                 ds_intensity_mean = h5.create_dataset('particle_intensity_mean', shape=n_ds, compression=compression,
                                                       compression_opts=compression_opts)
@@ -507,6 +567,11 @@ class ConfigManager:
                 ds_laser_width.attrs['units'] = 'm'
                 ds_laser_width.make_scale()
 
+                ds_bitdepth = h5.create_dataset('bit_depth', shape=n_ds, compression=compression,
+                                                compression_opts=compression_opts, dtype=int)
+                ds_bitdepth.attrs['units'] = ''
+                ds_bitdepth.make_scale()
+
                 ds_laser_shape_factor = h5.create_dataset('laser_shape_factor', shape=n_ds, compression=compression,
                                                           compression_opts=compression_opts)
                 ds_laser_shape_factor.attrs['units'] = ''
@@ -521,20 +586,26 @@ class ConfigManager:
                 ds_nparticles[:] = npart
                 ds_particledens[:] = npart / (nx * ny)
                 ds_mean_size[:] = [np.mean(p['size']) for p in particle_information]
+                ds_configured_mean_size[:] = [a['particle_size_mean'] for a in attrs]
+                ds_configured_std_size[:] = [a['particle_size_std'] for a in attrs]
                 ds_std_size[:] = [np.std(p['size']) for p in particle_information]
                 ds_intensity_mean[:] = [np.mean(p['intensity']) for p in particle_information]
                 ds_intensity_std[:] = [np.std(p['intensity']) for p in particle_information]
+                ds_bitdepth[:] = [a['bit_depth'] for a in attrs]
 
                 for ds in (ds_imageindex, ds_nparticles, ds_mean_size, ds_std_size,
                            ds_intensity_mean, ds_intensity_std,
                            ds_laser_width, ds_laser_shape_factor, ds_n_satpx,
-                           ds_particledens):
+                           ds_particledens, ds_bitdepth,
+                           ds_configured_mean_size,
+                           ds_configured_std_size):
                     ds_images.dims[0].attach_scale(ds)
                 ds_images.dims[1].attach_scale(ds_y_pixel_coord)
                 ds_images.dims[2].attach_scale(ds_x_pixel_coord)
 
-                translations.translate_standard_names(h5, translation_dict=standard_name_table._translation_dict[
-                    'synpivimage'])
+                sntt = StandardNameTableTranslation.from_yaml(
+                    pathlib.Path(__file__).parent / 'synpivimage-to-synpiv-v1.yml')
+                sntt.translate_group(h5)
                 print('... done.')
         return filenames
 
