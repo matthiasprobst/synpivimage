@@ -2,10 +2,11 @@ snt: synpiv-v1
 ---
 translation_dict:
   images: synthetic_particle_image
-  nparticle: number_of_particles
+  nparticles: number_of_particles
   particle_density: image_particle_density
   particle_size_mean: mean_particle_diameter
   particle_size_std: standard_deviation_of_mean_particle_diameter
   number_of_saturated_pixels: saturated_pixel_number
   laser_width: laser_sheet_thickness
+  laser_shape_factor: laser_shape_factor
   bit_depth: image_bit_depth

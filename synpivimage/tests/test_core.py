@@ -11,6 +11,16 @@ from synpivimage import build_ConfigManager
 
 class TestCore(unittest.TestCase):
 
+    def setUp(self) -> None:
+        hdf_filename = pathlib.Path('ds_000000.hdf')
+        if hdf_filename.exists():
+            hdf_filename.unlink(missing_ok=True)
+
+    def tearDown(self) -> None:
+        hdf_filename = pathlib.Path('ds_000000.hdf')
+        if hdf_filename.exists():
+            hdf_filename.unlink(missing_ok=True)
+
     def test_version(self):
         try:
             from importlib.metadata import version as _version
@@ -32,8 +42,6 @@ class TestCore(unittest.TestCase):
         assert np.array_equal(np.unique(np.sort(generated_particle_number)), particle_number_range[1])
 
     def test_to_hdf(self):
-        if pathlib.Path('ds_000000.hdf').exists():
-            pathlib.Path('ds_000000.hdf').unlink()
         # python3.8 only:
         # pathlib.Path('ds_000000.hdf').unlink(missing_ok=True)
         cfg = DEFAULT_CFG
@@ -42,7 +50,9 @@ class TestCore(unittest.TestCase):
         particle_number_range = ('particle_number', np.linspace(1, cfg['ny'] * cfg['nx'], 5).astype(int))
         CFG = build_ConfigManager(cfg, [particle_number_range, ], per_combination=1)
         CFG.to_hdf('.', nproc=1)
-        with h5py.File('ds_000000.hdf') as h5:
+
+        hdf_filename = 'ds_000000.hdf'
+        with h5py.File(hdf_filename) as h5:
             self.assertIn('images', h5)
             self.assertIn('image_index', h5)
             self.assertTrue(h5['images'].attrs['standard_name'], 'synthetic_particle_image')
@@ -52,4 +62,8 @@ class TestCore(unittest.TestCase):
                     assert h5[dsname].dims[0][1] == h5['nparticles']
             assert h5['images'].dims[1][0] == h5['iy']
             assert h5['images'].dims[2][0] == h5['ix']
-        pathlib.Path('ds_000000.hdf').unlink(missing_ok=True)
+
+        from h5rdmtoolbox.conventions.layout import H5Layout
+        h5l = H5Layout(pathlib.Path(__file__).parent / '../synpivimage.layout')
+        h5l.check_file(hdf_filename)
+        self.assertEqual(h5l.n_issues, 0)

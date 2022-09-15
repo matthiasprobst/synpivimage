@@ -547,19 +547,19 @@ class ConfigManager:
                 ds_configured_std_size.attrs['units'] = 'px'
                 ds_configured_std_size.make_scale()
 
-                ds_intensity_mean = h5.create_dataset('particle_intensity_mean', shape=n_ds, compression=compression,
-                                                      compression_opts=compression_opts)
-                ds_intensity_mean.attrs['units'] = 'counts'
-                ds_intensity_mean.make_scale()
-
-                ds_intensity_std = h5.create_dataset('particle_intensity_std', shape=n_ds, compression=compression,
-                                                     compression_opts=compression_opts)
-                ds_intensity_std.attrs['units'] = 'counts'
-                ds_intensity_std.make_scale()
+                # ds_intensity_mean = h5.create_dataset('particle_intensity_mean', shape=n_ds, compression=compression,
+                #                                       compression_opts=compression_opts)
+                # ds_intensity_mean.attrs['units'] = 'counts'
+                # ds_intensity_mean.make_scale()
+                #
+                # ds_intensity_std = h5.create_dataset('particle_intensity_std', shape=n_ds, compression=compression,
+                #                                      compression_opts=compression_opts)
+                # ds_intensity_std.attrs['units'] = 'counts'
+                # ds_intensity_std.make_scale()
 
                 ds_n_satpx = h5.create_dataset('number_of_saturated_pixels', shape=n_ds, compression=compression,
                                                compression_opts=compression_opts)
-                ds_n_satpx.attrs['units'] = 'counts'
+                ds_n_satpx.attrs['units'] = ''
                 ds_n_satpx.make_scale()
 
                 ds_laser_width = h5.create_dataset('laser_width', shape=n_ds, compression=compression,
@@ -589,12 +589,12 @@ class ConfigManager:
                 ds_configured_mean_size[:] = [a['particle_size_mean'] for a in attrs]
                 ds_configured_std_size[:] = [a['particle_size_std'] for a in attrs]
                 ds_std_size[:] = [np.std(p['size']) for p in particle_information]
-                ds_intensity_mean[:] = [np.mean(p['intensity']) for p in particle_information]
-                ds_intensity_std[:] = [np.std(p['intensity']) for p in particle_information]
+                # ds_intensity_mean[:] = [np.mean(p['intensity']) for p in particle_information]
+                # ds_intensity_std[:] = [np.std(p['intensity']) for p in particle_information]
                 ds_bitdepth[:] = [a['bit_depth'] for a in attrs]
 
                 for ds in (ds_imageindex, ds_nparticles, ds_mean_size, ds_std_size,
-                           ds_intensity_mean, ds_intensity_std,
+                           # ds_intensity_mean, ds_intensity_std,
                            ds_laser_width, ds_laser_shape_factor, ds_n_satpx,
                            ds_particledens, ds_bitdepth,
                            ds_configured_mean_size,
