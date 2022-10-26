@@ -39,3 +39,4 @@ testdata
 *.nc
 *.hdf
 *.hdf5
+.pylintrc

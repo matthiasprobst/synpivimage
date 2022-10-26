@@ -1,3 +1,4 @@
+"""Version module"""
 try:
     from importlib.metadata import version as _version
 

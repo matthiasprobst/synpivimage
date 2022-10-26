@@ -1,11 +1,12 @@
-snt: synpiv-v1
----
-translation_dict:
+snt: particle_iamge_velocimety-v1
+table:
+  ix: x_pixel_coordinate
+  iy: y_pixel_coordinate
   images: synthetic_particle_image
   nparticles: number_of_particles
   particle_density: image_particle_density
-  particle_size_mean: mean_particle_diameter
-  particle_size_std: standard_deviation_of_mean_particle_diameter
+  particle_size_mean: mean_image_particle_diameter
+  particle_size_std: standard_deviation_of_image_particle_diameter
   number_of_saturated_pixels: saturated_pixel_number
   laser_width: laser_sheet_thickness
   laser_shape_factor: laser_shape_factor

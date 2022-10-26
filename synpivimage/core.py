@@ -1,7 +1,7 @@
+"""Core module"""
 import itertools
 import multiprocessing as mp
 import os
-import pathlib
 import random
 import warnings
 from dataclasses import dataclass
@@ -15,12 +15,19 @@ import yaml
 from tqdm import tqdm
 
 from ._version import __version__
+from .conventions import StandardNameTranslation
 from .noise import add_camera_noise
 
 try:
-    from h5rdmtoolbox.conventions import StandardNameTable, StandardNameTableTranslation
+    import h5rdmtoolbox as h5tbx
+
+    h5tbx_is_available = True
 except ImportError as e:
-    print(e)
+    h5tbx_is_available = False
+
+if h5tbx_is_available:
+    h5tbx.use('cflike')
+
 np.random.seed()
 CPU_COUNT = mp.cpu_count()
 
@@ -29,13 +36,20 @@ default_yaml_file = 'default.yaml'
 PMIN_ALLOWED = 0.1
 
 # default config has no noise since it can be added afterwards, too
-DEFAULT_CFG = {'ny': 128, 'nx': 128, 'square_image': True,
+DEFAULT_CFG = {'ny': 128,
+               'nx': 128,
+               'square_image': True,
                'bit_depth': 16,
-               'noise_baseline': 0.0, 'dark_noise': 0.0,  # 'noise_baseline': 20, 'dark_noise': 2.29,
-               'sensitivity': 1, 'qe': 1, 'shot_noise': False,
-               'particle_number': 1, 'particle_size_mean': 2.5,
+               'noise_baseline': 0.0,
+               'dark_noise': 0.0,  # 'noise_baseline': 20, 'dark_noise': 2.29,
+               'sensitivity': 1,
+               'qe': 1,
+               'shot_noise': False,
+               'particle_number': 1,
+               'particle_size_mean': 2.5,
                'particle_size_std': 0.25,
-               'laser_width': 3, 'laser_shape_factor': 2,
+               'laser_width': 3,
+               'laser_shape_factor': 2,
                'sensor_gain': 1.0,  # a particle hit by max laser intensity will show max count on the sensor
                # 'laser_max_intensity': 1000
                'particle_position_file': None,
@@ -60,6 +74,7 @@ def particle_location_from_file(filename: str) -> Tuple[np.ndarray, np.ndarray, 
 
 
 def process_config_for_particle_position(cfg: Dict):
+    """Process the config dictionary and return particle property (position + size)"""
     if cfg['particle_position_file'] is None:
         return None
     xp, yp, zp, dp = particle_location_from_file(cfg['particle_position_file'])
@@ -128,8 +143,8 @@ def generate_image(config_or_yaml: Dict or str, particle_data: dict = None, **kw
         yp = particle_data['y']
         zp = particle_data['z']
         psizes = particle_data['size']
-        if any([_arg is not None for _arg in (xp, yp, zp, psizes)]):
-            if not all([_arg is not None for _arg in (xp, yp, zp, psizes)]):
+        if any(_arg is not None for _arg in (xp, yp, zp, psizes)):
+            if not all(_arg is not None for _arg in (xp, yp, zp, psizes)):
                 raise ValueError('If particle properties are set manually, all (xp, yp, zp and size)'
                                  'must be set!')
             if not isinstance(xp, np.ndarray):
@@ -170,7 +185,7 @@ def generate_image(config_or_yaml: Dict or str, particle_data: dict = None, **kw
             warnings.warn(f'Particles smaller then {PMIN_ALLOWED} are set to {PMIN_ALLOWED}.')
             pmin = PMIN_ALLOWED
             if pmean <= pmin:
-                raise ValueError(f'Mean particle size must be larger than smallest particle size!')
+                raise ValueError('Mean particle size must be larger than smallest particle size!')
         pmax = pmean + 3 * pstd  # max particle size is 3*sigma above mean psize
 
     ppp = n_particles / image_size  # real ppp
@@ -214,7 +229,7 @@ def generate_image(config_or_yaml: Dict or str, particle_data: dict = None, **kw
     part_intensity = part_intensity * q * config['sensor_gain']
     ny, nx = image_shape
     # nsigma = 4
-    for x, y, z, psize, pint in zip(xp, yp, zp, psizes, part_intensity):
+    for x, y, psize, pint in zip(xp, yp, psizes, part_intensity):
         delta = int(10 * psize)
         xint = int(x)
         yint = int(y)
@@ -325,23 +340,10 @@ def particle_intensity(z: np.ndarray, dz0: float, s: int, dp: np.ndarray = None)
     if s == 0:
         if dp is None:
             return np.ones_like(z)
-        else:
-            return np.ones_like(z) * dp ** 2 * np.pi / 8
+        return np.ones_like(z) * dp ** 2 * np.pi / 8
     if dp is None:
         return np.exp(-1 / np.sqrt(2 * np.pi) * np.abs(2 * z ** 2 / dz0 ** 2) ** s)
-    else:
-        return np.exp(-1 / np.sqrt(2 * np.pi) * np.abs(2 * z ** 2 / dz0 ** 2) ** s) * dp ** 2 * np.pi / 8
-
-
-def _generate_images_and_store_to_nc(cfg: Dict, n: int,
-                                     data_directory: Union[str, bytes, os.PathLike]) -> None:
-    _data_dir = Path(data_directory)
-    if not _data_dir.is_dir():
-        os.mkdir(_data_dir)
-
-    for i in range(n):
-        _intensity, _partpos = generate_image(cfg)
-        save_dataset(_data_dir.joinpath(f'ds{cfg["fname"]}_{i:04d}.nc'), _intensity, _partpos)
+    return np.exp(-1 / np.sqrt(2 * np.pi) * np.abs(2 * z ** 2 / dz0 ** 2) ** s) * dp ** 2 * np.pi / 8
 
 
 def _generate(cfgs: List[Dict], nproc: int) -> Tuple[np.ndarray, List[Dict]]:
@@ -496,20 +498,18 @@ class ConfigManager:
                 ds_imageindex.make_scale()
 
                 ds_x_pixel_coord = h5.create_dataset('ix', data=np.arange(0, nx, 1), dtype=int)
-                ds_x_pixel_coord.attrs['standard_name'] = 'x_pixel_coordinate'
-                ds_x_pixel_coord.attrs['units'] = 'px'
+                ds_x_pixel_coord.attrs['units'] = 'pixel'
                 ds_x_pixel_coord.make_scale()
 
                 ds_y_pixel_coord = h5.create_dataset('iy', data=np.arange(0, ny, 1), dtype=int)
-                ds_y_pixel_coord.attrs['standard_name'] = 'y_pixel_coordinate'
-                ds_y_pixel_coord.attrs['units'] = 'px'
+                ds_y_pixel_coord.attrs['units'] = 'pixel'
                 ds_y_pixel_coord.make_scale()
 
                 ds_images = h5.create_dataset('images', shape=images.shape, compression=compression,
                                               compression_opts=compression_opts,
                                               chunks=(1, *images.shape[1:]))
                 ds_images.attrs['long_name'] = 'image intensity'
-                ds_images.attrs['units'] = 'counts'
+                ds_images.attrs['units'] = 'count'
 
                 ds_nparticles = h5.create_dataset('nparticles', shape=n_ds,
                                                   compression=compression,
@@ -522,39 +522,39 @@ class ConfigManager:
                                                     compression=compression,
                                                     compression_opts=compression_opts, dtype=float)
                 ds_particledens.attrs['long_name'] = 'particle density'
-                ds_particledens.attrs['units'] = '1/px'
+                ds_particledens.attrs['units'] = '1/pixel'
                 ds_particledens.make_scale()
 
                 ds_mean_size = h5.create_dataset('particle_size_mean', shape=n_ds, compression=compression,
                                                  compression_opts=compression_opts)
-                ds_mean_size.attrs['units'] = 'px'
+                ds_mean_size.attrs['units'] = 'pixel'
                 ds_mean_size.make_scale()
 
                 ds_configured_mean_size = h5.create_dataset('configured_particle_size_mean', shape=n_ds,
                                                             compression=compression,
                                                             compression_opts=compression_opts)
-                ds_configured_mean_size.attrs['units'] = 'px'
+                ds_configured_mean_size.attrs['units'] = 'pixel'
                 ds_configured_mean_size.make_scale()
 
                 ds_std_size = h5.create_dataset('particle_size_std', shape=n_ds, compression=compression,
                                                 compression_opts=compression_opts)
-                ds_std_size.attrs['units'] = 'px'
+                ds_std_size.attrs['units'] = 'pixel'
                 ds_std_size.make_scale()
 
                 ds_configured_std_size = h5.create_dataset('configured_particle_size_std', shape=n_ds,
                                                            compression=compression,
                                                            compression_opts=compression_opts)
-                ds_configured_std_size.attrs['units'] = 'px'
+                ds_configured_std_size.attrs['units'] = 'pixel'
                 ds_configured_std_size.make_scale()
 
                 # ds_intensity_mean = h5.create_dataset('particle_intensity_mean', shape=n_ds, compression=compression,
                 #                                       compression_opts=compression_opts)
-                # ds_intensity_mean.attrs['units'] = 'counts'
+                # ds_intensity_mean.attrs['units'] = 'count'
                 # ds_intensity_mean.make_scale()
                 #
                 # ds_intensity_std = h5.create_dataset('particle_intensity_std', shape=n_ds, compression=compression,
                 #                                      compression_opts=compression_opts)
-                # ds_intensity_std.attrs['units'] = 'counts'
+                # ds_intensity_std.attrs['units'] = 'count'
                 # ds_intensity_std.make_scale()
 
                 ds_n_satpx = h5.create_dataset('number_of_saturated_pixels', shape=n_ds, compression=compression,
@@ -569,7 +569,7 @@ class ConfigManager:
 
                 ds_bitdepth = h5.create_dataset('bit_depth', shape=n_ds, compression=compression,
                                                 compression_opts=compression_opts, dtype=int)
-                ds_bitdepth.attrs['units'] = ''
+                ds_bitdepth.attrs['units'] = 'count'
                 ds_bitdepth.make_scale()
 
                 ds_laser_shape_factor = h5.create_dataset('laser_shape_factor', shape=n_ds, compression=compression,
@@ -603,9 +603,10 @@ class ConfigManager:
                 ds_images.dims[1].attach_scale(ds_y_pixel_coord)
                 ds_images.dims[2].attach_scale(ds_x_pixel_coord)
 
-                sntt = StandardNameTableTranslation.from_yaml(
-                    pathlib.Path(__file__).parent / 'synpivimage-to-synpiv-v1.yml')
-                sntt.translate_group(h5)
+                if h5tbx_is_available:
+                    print('Processing standard names...')
+                    sntt = StandardNameTranslation()
+                    sntt.translate_group(h5)
                 print('... done.')
         return filenames
 
