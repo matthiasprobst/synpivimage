@@ -1,18 +1,19 @@
 """Core module"""
+import h5py
 import itertools
 import multiprocessing as mp
+import numpy as np
 import os
 import random
 import warnings
+import xarray as xr
+import yaml
 from dataclasses import dataclass
 from math import ceil
 from pathlib import Path
-from typing import Dict, List, Union, Tuple
-
-import h5py
-import numpy as np
-import yaml
+from scipy.ndimage import gaussian_filter
 from tqdm import tqdm
+from typing import Dict, List, Union, Tuple
 
 from ._version import __version__
 from .conventions import StandardNameTranslation
@@ -110,7 +111,7 @@ def read_config(filename: Union[str, bytes, os.PathLike]) -> Dict:
     return yaml2dict(filename)
 
 
-def generate_image(config_or_yaml: Dict or str, particle_data: dict = None, **kwargs) -> Tuple[np.ndarray, Dict]:
+def generate_image(config_or_yaml: Dict or str, particle_data: dict = None, **kwargs) -> Tuple[np.ndarray, Dict, Dict]:
     """
     Generates a particle image based on a config (file). The generated image and the
     paticle data as a dictionary is returned.
@@ -346,7 +347,7 @@ def particle_intensity(z: np.ndarray, dz0: float, s: int, dp: np.ndarray = None)
     return np.exp(-1 / np.sqrt(2 * np.pi) * np.abs(2 * z ** 2 / dz0 ** 2) ** s) * dp ** 2 * np.pi / 8
 
 
-def _generate(cfgs: List[Dict], nproc: int) -> Tuple[np.ndarray, List[Dict]]:
+def _generate(cfgs: List[Dict], nproc: int) -> Tuple[np.ndarray, List[Dict], List[Dict]]:
     """Generates the particle image(s) and returns those alongside with the particle
     information hidden in the image(s)
 
@@ -425,12 +426,13 @@ class ConfigManager:
         return _generate(self.cfgs, nproc)
 
     def to_hdf(self, data_directory: Union[str, bytes, os.PathLike],
+               create_labels: bool = True,
                overwrite: bool = False, nproc: int = CPU_COUNT,
                compression: str = 'gzip', compression_opts: int = 5,
                n_split: int = 10000) -> List[Path]:
         """
         Generates the images and writes data in chunks to multiple files according to chunking.
-        Besides the generated image, the following meta informations are also stored with the intention
+        Besides, the generated image, the following meta information are also stored with the intention
         that they will be used as labels:
         - number of particles
         - particle size mean
@@ -445,6 +447,8 @@ class ConfigManager:
         ----------
         data_directory: str, bytes, os.PathLike
             Path to directory where HDF5 files should be stored.
+        create_labels: bool, default=True
+            Whether to create label dataset or not.
         overwrite: bool, default=False
             Whether to overwrite existing data.
         nproc: int, default=CPU_COUNT
@@ -487,6 +491,8 @@ class ConfigManager:
         filenames = []
         for ichunk, cfg_chunk in enumerate(chunked_cfgs):
             images, attrs, particle_information = _generate(cfg_chunk, nproc)
+            assert images.shape[0] == len(particle_information)
+            assert images.shape[0] == len(attrs)
             new_name = f'ds_{ichunk:06d}.hdf'
             new_filename = _dir.joinpath(new_name)
             filenames.append(new_filename)
@@ -510,6 +516,13 @@ class ConfigManager:
                                               chunks=(1, *images.shape[1:]))
                 ds_images.attrs['long_name'] = 'image intensity'
                 ds_images.attrs['units'] = 'count'
+
+                if create_labels:
+                    ds_labels = h5.create_dataset('labels', shape=images.shape, compression=compression,
+                                                  compression_opts=compression_opts,
+                                                  chunks=(1, *images.shape[1:]))
+                    ds_labels.attrs['long_name'] = 'image label'
+                    ds_labels.attrs['units'] = ' '
 
                 ds_nparticles = h5.create_dataset('nparticles', shape=n_ds,
                                                   compression=compression,
@@ -582,6 +595,11 @@ class ConfigManager:
                 ds_laser_width[:] = [a['laser_width'] for a in attrs]
 
                 ds_images[:] = images
+                ds_labels[:] = np.stack([generate_label(p_info['x'],
+                                                        p_info['y'],
+                                                        images.shape[1:],
+                                                        False) for p_info in particle_information])
+                assert ds_labels.shape == images.shape
                 npart = np.asarray([len(p['x']) for p in particle_information])
                 ds_nparticles[:] = npart
                 ds_particledens[:] = npart / (nx * ny)
@@ -600,13 +618,16 @@ class ConfigManager:
                            ds_configured_mean_size,
                            ds_configured_std_size):
                     ds_images.dims[0].attach_scale(ds)
+                    ds_labels.dims[0].attach_scale(ds)
                 ds_images.dims[1].attach_scale(ds_y_pixel_coord)
                 ds_images.dims[2].attach_scale(ds_x_pixel_coord)
+                ds_labels.dims[1].attach_scale(ds_y_pixel_coord)
+                ds_labels.dims[2].attach_scale(ds_x_pixel_coord)
 
                 if h5tbx_is_available:
                     print('Processing standard names...')
-                    sntt = StandardNameTranslation()
-                    sntt.translate_group(h5)
+                    sntr = StandardNameTranslation()
+                    sntr.translate_group(h5)
                 print('... done.')
         return filenames
 
@@ -616,7 +637,7 @@ def build_ConfigManager(initial_cfg: Dict,
                         per_combination: int = 1, shuffle: bool = True) -> ConfigManager:
     """Generates a list of configuration dictionaries.
     Request an initial configuration and a tuple of variable length containing
-    the name of a dictionary key of the configuraiton and the values to be chosen.
+    the name of a dictionary key of the configuration and the values to be chosen.
     A list containing configuration dictionaries of all combinations is
     returned. Moreover, a filename is generated and added to the dictionary.
 
@@ -659,6 +680,30 @@ def build_ConfigManager(initial_cfg: Dict,
     if shuffle:
         random.shuffle(cfgs)
     return ConfigManager(cfgs)
+
+
+def generate_label(x, y, image_shape, ret_xr=True):
+    """generate label based on x and y positions"""
+    label = np.zeros(image_shape, dtype=np.float32)
+
+    # loop over objects positions and marked them with 100 on a label
+    # note: *_ because some datasets contain more info except x, y coordinates
+    for _x, _y in zip(x, y):
+        if _y <= image_shape[0] and _x <= image_shape[1]:
+            label[int(_y)][int(_x)] += 100
+
+    # apply a convolution with a Gaussian kernel
+    label = gaussian_filter(label, sigma=(1, 1), order=0)
+
+    if ret_xr:
+        return xr.DataArray(dims=('y', 'x'), data=label, attrs={'long_name': 'Label for density map CNN',
+                                                                'comment': 'Each particle got value 100 at '
+                                                                           'the respective integer position. '
+                                                                           'Afterwards, gaussian filter was applied. '
+                                                                           'Sum of array divided by 100 will '
+                                                                           'result in number of particles '
+                                                                           'in the image'})
+    return label
 
 
 if __name__ == '__main__':

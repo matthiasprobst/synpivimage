@@ -1,9 +1,8 @@
+import h5py
+import numpy as np
 import pathlib
 import unittest
 import warnings
-
-import h5py
-import numpy as np
 
 from synpivimage import DEFAULT_CFG
 from synpivimage import build_ConfigManager
@@ -48,11 +47,11 @@ class TestCore(unittest.TestCase):
         hdf_filename = 'ds_000000.hdf'
 
         try:
-            import h5rdmtoolbox as h5tbx
-            snt = h5tbx.conventions.cflike.standard_name.StandardNameTable.from_gitlab(url='https://git.scc.kit.edu',
-                                                                                       file_path='particle_image_velocimetry-v1.yaml',
-                                                                                       project_id='35942',
-                                                                                       ref_name='main')
+            from h5rdmtoolbox.conventions.cflike import StandardNameTable
+            snt = StandardNameTable.from_gitlab(url='https://git.scc.kit.edu',
+                                                file_path='particle_image_velocimetry-v1.yaml',
+                                                project_id='35942',
+                                                ref_name='main')
 
             snt.check_file(hdf_filename)
         except ImportError:
@@ -60,6 +59,9 @@ class TestCore(unittest.TestCase):
 
         with h5py.File(hdf_filename) as h5:
             self.assertIn('images', h5)
+            self.assertIn('labels', h5)
+            self.assertEqual(h5['labels'].shape, h5['images'].shape)
+            np.testing.assert_almost_equal(h5['nparticles'][:], (h5['labels'][...].sum(axis=(1, 2))/100).astype(int))
             self.assertIn('image_index', h5)
             self.assertTrue(h5['images'].attrs['standard_name'], 'synthetic_particle_image')
             for dsname in h5.keys():
