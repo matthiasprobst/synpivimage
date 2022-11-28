@@ -16,11 +16,11 @@ from tqdm import tqdm
 from typing import Dict, List, Union, Tuple
 
 from ._version import __version__
-from .conventions import StandardNameTranslation
 from .noise import add_camera_noise
 
 try:
     import h5rdmtoolbox as h5tbx
+    from .conventions import StandardNameTranslation
 
     h5tbx_is_available = True
 except ImportError as e:
@@ -674,7 +674,7 @@ def build_ConfigManager(initial_cfg: Dict,
             cfgs.append(initial_cfg.copy())
             for k, v in param_dict.items():
                 cfgs[-1][k] = v
-                # a a raw filename without extension to the dictionary:
+                # a raw filename without extension to the dictionary:
             cfgs[-1]['fname'] = f'ds{count:06d}'
             count += 1
     if shuffle:
