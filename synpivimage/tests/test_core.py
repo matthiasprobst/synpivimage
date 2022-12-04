@@ -36,13 +36,13 @@ class TestCore(unittest.TestCase):
         generated_particle_number = [cfg['particle_number'] for cfg in CFG.cfgs]
         assert np.array_equal(np.unique(np.sort(generated_particle_number)), particle_number_range[1])
 
-    def test_to_hdf(self):
+    def test_generate(self):
         cfg = DEFAULT_CFG
         cfg['nx'] = 16
         cfg['ny'] = 16
         particle_number_range = ('particle_number', np.linspace(1, cfg['ny'] * cfg['nx'], 5).astype(int))
         CFG = build_ConfigManager(cfg, [particle_number_range, ], per_combination=1)
-        CFG.to_hdf('.', nproc=1)
+        CFG.generate('.', nproc=1)
 
         hdf_filename = 'ds_000000.hdf'
 
@@ -61,13 +61,13 @@ class TestCore(unittest.TestCase):
             self.assertIn('images', h5)
             self.assertIn('labels', h5)
             self.assertEqual(h5['labels'].shape, h5['images'].shape)
-            np.testing.assert_almost_equal(h5['nparticles'][:], (h5['labels'][...].sum(axis=(1, 2))/100).astype(int))
+            np.testing.assert_almost_equal(h5['nparticles'][:], (h5['labels'][...].sum(axis=(1, 2)) / 100).astype(int))
             self.assertIn('image_index', h5)
             self.assertTrue(h5['images'].attrs['standard_name'], 'synthetic_particle_image')
-            for dsname in h5.keys():
-                if isinstance(h5[dsname], h5py.Dataset) and dsname == 'images':
-                    assert h5[dsname].dims[0][0] == h5['image_index']
-                    assert h5[dsname].dims[0][1] == h5['nparticles']
+            for ds_name in h5.keys():
+                if isinstance(h5[ds_name], h5py.Dataset) and ds_name == 'images':
+                    assert h5[ds_name].dims[0][0] == h5['image_index']
+                    assert h5[ds_name].dims[0][1] == h5['nparticles']
             assert h5['images'].dims[1][0] == h5['iy']
             assert h5['images'].dims[2][0] == h5['ix']
 

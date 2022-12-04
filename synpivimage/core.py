@@ -32,9 +32,9 @@ if h5tbx_is_available:
 np.random.seed()
 CPU_COUNT = mp.cpu_count()
 
-default_yaml_file = 'default.yaml'
+default_yaml_file: str = 'default.yaml'
 
-PMIN_ALLOWED = 0.1
+PMIN_ALLOWED: float = 0.1
 
 # default config has no noise since it can be added afterwards, too
 DEFAULT_CFG = {'ny': 128,
@@ -114,7 +114,7 @@ def read_config(filename: Union[str, bytes, os.PathLike]) -> Dict:
 def generate_image(config_or_yaml: Dict or str, particle_data: dict = None, **kwargs) -> Tuple[np.ndarray, Dict, Dict]:
     """
     Generates a particle image based on a config (file). The generated image and the
-    paticle data as a dictionary is returned.
+    particle data as a dictionary is returned.
     Particle positions are generated randomly or may be set via particle_data
     (dictionary with keys x, y, z, s).
     In the latter case, the density
@@ -143,9 +143,9 @@ def generate_image(config_or_yaml: Dict or str, particle_data: dict = None, **kw
         xp = particle_data['x']
         yp = particle_data['y']
         zp = particle_data['z']
-        psizes = particle_data['size']
-        if any(_arg is not None for _arg in (xp, yp, zp, psizes)):
-            if not all(_arg is not None for _arg in (xp, yp, zp, psizes)):
+        particle_sizes = particle_data['size']
+        if any(_arg is not None for _arg in (xp, yp, zp, particle_sizes)):
+            if not all(_arg is not None for _arg in (xp, yp, zp, particle_sizes)):
                 raise ValueError('If particle properties are set manually, all (xp, yp, zp and size)'
                                  'must be set!')
             if not isinstance(xp, np.ndarray):
@@ -163,13 +163,13 @@ def generate_image(config_or_yaml: Dict or str, particle_data: dict = None, **kw
                     zp = np.array([zp])
                 else:
                     zp = np.asarray(zp)
-            if not isinstance(psizes, np.ndarray):
-                if isinstance(psizes, (int, float)):
-                    psizes = np.array([psizes])
+            if not isinstance(particle_sizes, np.ndarray):
+                if isinstance(particle_sizes, (int, float)):
+                    particle_sizes = np.array([particle_sizes])
                 else:
-                    psizes = np.asarray(psizes)
+                    particle_sizes = np.asarray(particle_sizes)
             # particle positions are set manually:
-            for _arg in (xp, yp, zp, psizes):
+            for _arg in (xp, yp, zp, particle_sizes):
                 if _arg.ndim != 1:
                     raise ValueError(f'particle information must be 1D and not {_arg.ndim}D: {_arg}')
             n_particles = xp.size
@@ -211,26 +211,26 @@ def generate_image(config_or_yaml: Dict or str, particle_data: dict = None, **kw
             yp = np.random.random(n_particles) * image_shape[0]
         zp = np.random.random(n_particles) * zminmax * 2 - zminmax  # physical location in laser sheet! TODO: units??!!
         # we should not clip the normal distribution
-        # psizes = np.clip(np.random.normal(pmean, pstd, n_particles), pmin, pmax)
-        # but rather redo the normal distbution for the outliers:
-        psizes = np.random.normal(pmean, pstd, n_particles)
-        iout = np.argwhere((psizes < pmin) | (psizes > pmax))
+        # particle_sizes = np.clip(np.random.normal(pmean, pstd, n_particles), pmin, pmax)
+        # but rather redo the normal distribution for the outliers:
+        particle_sizes = np.random.normal(pmean, pstd, n_particles)
+        iout = np.argwhere((particle_sizes < pmin) | (particle_sizes > pmax))
         for i in iout[:, 0]:
             dp = np.random.normal(pmean, pstd)
             while dp < pmin or dp > pmax:
                 dp = np.random.normal(pmean, pstd)
-            psizes[i] = dp
+            particle_sizes[i] = dp
 
     # illuminate:
     if config['particle_size_illumination_dependency']:
-        part_intensity = particle_intensity(zp, dz0, s, dp=psizes)
-        part_intensity = part_intensity / (np.pi * max(psizes) ** 2 / 8)
+        part_intensity = particle_intensity(zp, dz0, s, dp=particle_sizes)
+        part_intensity = part_intensity / (np.pi * max(particle_sizes) ** 2 / 8)
     else:
         part_intensity = particle_intensity(zp, dz0, s)
     part_intensity = part_intensity * q * config['sensor_gain']
     ny, nx = image_shape
     # nsigma = 4
-    for x, y, psize, pint in zip(xp, yp, psizes, part_intensity):
+    for x, y, psize, pint in zip(xp, yp, particle_sizes, part_intensity):
         delta = int(10 * psize)
         xint = int(x)
         yint = int(y)
@@ -264,8 +264,8 @@ def generate_image(config_or_yaml: Dict or str, particle_data: dict = None, **kw
              'noise_eq': qe,
              'noise_sensitivity': sensitivity,
              'n_saturated_pixels': n_saturated_pixels,
-             # 'ps_mean': np.mean(psizes),
-             # 'ps_std': np.std(psizes),
+             # 'ps_mean': np.mean(particle_sizes),
+             # 'ps_std': np.std(particle_sizes),
              'ppp': ppp,
              'n_particles': n_particles,
              'laser_width': dz0,
@@ -277,37 +277,9 @@ def generate_image(config_or_yaml: Dict or str, particle_data: dict = None, **kw
              'code_source': 'https://git.scc.kit.edu/da4323/piv-particle-density',
              'version': __version__}
 
-    return _intensity.astype(int), attrs, {'x': xp, 'y': yp, 'z': zp, 'size': psizes, 'intensity': part_intensity}
-
-
-# def combine_particle_image_data_arrays(datasets: List[xr.DataArray]) -> xr.DataArray:
-#     """Combines the xr.DataArrays to a single DataArray"""
-#     # _ = xr.DataArray(dims='image_index', data=np.arange(1, len(datasets) + 1))
-#     ni = xr.DataArray(name='n_particles', dims='image_index', data=[d.n_particles for d in datasets])
-#     ps_mean = xr.DataArray(name='ps_mean', dims='image_index', data=[d.ps_mean for d in datasets])
-#     ps_std = xr.DataArray(name='ps_std', dims='image_index', data=[d.ps_std for d in datasets])
-#     noise_baseline = xr.DataArray(name='noise_baseline', dims='image_index',
-#                                   data=[d.noise_baseline for d in datasets])
-#     noise_darknoise = xr.DataArray(name='dark_noise', dims='image_index',
-#                                    data=[d.noise_darknoise for d in datasets])
-#     n_saturated_pixels = xr.DataArray(name='n_saturated_pixels ', dims='image_index',
-#                                       data=[d.n_saturated_pixels for d in datasets])
-#
-#     attrs = {k: v for k, v in datasets[0].attrs.items() if k not in ('n_particles', 'ps_mean',
-#                                                                      'ps_std', 'noise_mean',
-#                                                                      'noise_std', 'n_saturated_pixels',
-#                                                                      'ppp')}
-#
-#     intensity = np.empty((len(datasets), *datasets[0].shape))
-#     for i in range(len(datasets)):
-#         intensity[i, ...] = datasets[i].values
-#
-#     return xr.DataArray(name='intensity', dims=('image_index', 'y', 'x'), data=intensity,
-#                         coords={'ps_mean': ps_mean, 'ps_std': ps_std, 'n_particles': ni,
-#                                 'noise_baseline': noise_baseline,
-#                                 'noise_darknoise': noise_darknoise,
-#                                 'n_saturated_pixels': n_saturated_pixels},
-#                         attrs=attrs)
+    return _intensity.astype(int), attrs, {'x': xp, 'y': yp, 'z': zp,
+                                           'size': particle_sizes,
+                                           'intensity': part_intensity}
 
 
 def _compute_max_z_position_from_laser_properties(dz0: float, s: int) -> float:
@@ -356,7 +328,7 @@ def _generate(cfgs: List[Dict], nproc: int) -> Tuple[np.ndarray, List[Dict], Lis
     cfgs: List[Dict]
         List of configuration to be passed to `generate_image`
     nproc: int, default=CPU_COUNT
-        Number of prcessors to be used to generate the data
+        Number of processors to be used to generate the data
 
     Returns
     -------
@@ -420,16 +392,31 @@ class ConfigManager:
     def __len__(self):
         return len(self.cfgs)
 
-    def generate(self, nproc: int = CPU_COUNT) -> Tuple[np.ndarray, np.ndarray]:
+    def generate(self, data_directory: Union[str, bytes, os.PathLike],
+                 create_labels: bool = True,
+                 overwrite: bool = False, nproc: int = CPU_COUNT,
+                 compression: str = 'gzip', compression_opts: int = 5,
+                 n_split: int = 10000) -> List[Path]:
         """returns the generated data (intensities and particle information)
         This will not return all particle image information. Only number of particles!"""
-        return _generate(self.cfgs, nproc)
+        return self._generate_and_store_in_hdf(data_directory,
+                                               create_labels,
+                                               overwrite,
+                                               nproc,
+                                               compression,
+                                               compression_opts,
+                                               n_split)
 
-    def to_hdf(self, data_directory: Union[str, bytes, os.PathLike],
-               create_labels: bool = True,
-               overwrite: bool = False, nproc: int = CPU_COUNT,
-               compression: str = 'gzip', compression_opts: int = 5,
-               n_split: int = 10000) -> List[Path]:
+    def to_hdf(self, *args, **kwargs) -> List[Path]:
+        """deprecated method --> generate()"""
+        warnings.warn('The method "to_hdf" is deprecated. Use "generate" instead', DeprecationWarning)
+        return self.generate(*args, **kwargs)
+
+    def _generate_and_store_in_hdf(self, data_directory: Union[str, bytes, os.PathLike],
+                                   create_labels: bool = True,
+                                   overwrite: bool = False, nproc: int = CPU_COUNT,
+                                   compression: str = 'gzip', compression_opts: int = 5,
+                                   n_split: int = 10000) -> List[Path]:
         """
         Generates the images and writes data in chunks to multiple files according to chunking.
         Besides, the generated image, the following meta information are also stored with the intention
@@ -489,11 +476,11 @@ class ConfigManager:
         print(f'Writing {len(self.cfgs)} dataset into {_nfiles} HDF5 file(s). This may take a while...')
 
         filenames = []
-        for ichunk, cfg_chunk in enumerate(chunked_cfgs):
+        for i_chunk, cfg_chunk in enumerate(chunked_cfgs):
             images, attrs, particle_information = _generate(cfg_chunk, nproc)
             assert images.shape[0] == len(particle_information)
             assert images.shape[0] == len(attrs)
-            new_name = f'ds_{ichunk:06d}.hdf'
+            new_name = f'ds_{i_chunk:06d}.hdf'
             new_filename = _dir.joinpath(new_name)
             filenames.append(new_filename)
             n_ds, ny, nx = images.shape
@@ -531,12 +518,12 @@ class ConfigManager:
                 ds_nparticles.attrs['units'] = ''
                 ds_nparticles.make_scale()
 
-                ds_particledens = h5.create_dataset('particle_density', shape=n_ds,
-                                                    compression=compression,
-                                                    compression_opts=compression_opts, dtype=float)
-                ds_particledens.attrs['long_name'] = 'particle density'
-                ds_particledens.attrs['units'] = '1/pixel'
-                ds_particledens.make_scale()
+                ds_particle_density = h5.create_dataset('particle_density', shape=n_ds,
+                                                        compression=compression,
+                                                        compression_opts=compression_opts, dtype=float)
+                ds_particle_density.attrs['long_name'] = 'particle density'
+                ds_particle_density.attrs['units'] = '1/pixel'
+                ds_particle_density.make_scale()
 
                 ds_mean_size = h5.create_dataset('particle_size_mean', shape=n_ds, compression=compression,
                                                  compression_opts=compression_opts)
@@ -602,7 +589,7 @@ class ConfigManager:
                 assert ds_labels.shape == images.shape
                 npart = np.asarray([len(p['x']) for p in particle_information])
                 ds_nparticles[:] = npart
-                ds_particledens[:] = npart / (nx * ny)
+                ds_particle_density[:] = npart / (nx * ny)
                 ds_mean_size[:] = [np.mean(p['size']) for p in particle_information]
                 ds_configured_mean_size[:] = [a['particle_size_mean'] for a in attrs]
                 ds_configured_std_size[:] = [a['particle_size_std'] for a in attrs]
@@ -614,7 +601,7 @@ class ConfigManager:
                 for ds in (ds_imageindex, ds_nparticles, ds_mean_size, ds_std_size,
                            # ds_intensity_mean, ds_intensity_std,
                            ds_laser_width, ds_laser_shape_factor, ds_n_satpx,
-                           ds_particledens, ds_bitdepth,
+                           ds_particle_density, ds_bitdepth,
                            ds_configured_mean_size,
                            ds_configured_std_size):
                     ds_images.dims[0].attach_scale(ds)
@@ -651,7 +638,7 @@ def build_ConfigManager(initial_cfg: Dict,
     per_combination: int=1
         Number of configurations per parameter set (It may be useful to repeat
         the generation of a specific parameter set because particles are randomly
-        generated. Default is 1.
+        generated). Default is 1.
     shuffle: bool=True
         Shuffle the config files. Default is True.
 
@@ -670,7 +657,7 @@ def build_ConfigManager(initial_cfg: Dict,
     cfgs = []
     count = 0
     for _, param_dict in enumerate(_dicts):
-        for icomb in range(per_combination):
+        for _ in range(per_combination):
             cfgs.append(initial_cfg.copy())
             for k, v in param_dict.items():
                 cfgs[-1][k] = v
