@@ -20,13 +20,14 @@ from .noise import add_camera_noise
 
 try:
     import h5rdmtoolbox as h5tbx
-    from .conventions import StandardNameTranslation
 
     h5tbx_is_available = True
 except ImportError as e:
     h5tbx_is_available = False
 
 if h5tbx_is_available:
+    from .conventions import StandardNameTranslation
+
     h5tbx.use('cflike')
 
 np.random.seed()
@@ -387,10 +388,21 @@ class ConfigManager:
             self.cfgs = (self.cfgs,)
 
     def __repr__(self):
-        return f'Configurations with {len(self.cfgs)} configurations'
+        return f'<ConfigManager ({len(self.cfgs)} configurations)>'
 
     def __len__(self):
         return len(self.cfgs)
+
+    @staticmethod
+    def from_variation_dict(initial_cfg: Dict,
+                            variation_dict,
+                            per_combination: int,
+                            shuffle: bool):
+        """inits the class based on the individual ranges of variables defined in the variation_dict"""
+        return build_ConfigManager(initial_cfg=initial_cfg,
+                                   variation_dict=variation_dict,
+                                   per_combination=per_combination,
+                                   shuffle=shuffle)
 
     def generate(self, data_directory: Union[str, bytes, os.PathLike],
                  create_labels: bool = True,
@@ -620,7 +632,7 @@ class ConfigManager:
 
 
 def build_ConfigManager(initial_cfg: Dict,
-                        variations: List[Tuple[str, Union[float, np.ndarray, Tuple]]],
+                        variation_dict: Dict,
                         per_combination: int = 1, shuffle: bool = True) -> ConfigManager:
     """Generates a list of configuration dictionaries.
     Request an initial configuration and a tuple of variable length containing
@@ -632,9 +644,9 @@ def build_ConfigManager(initial_cfg: Dict,
     ----------
     initial_cfg : Dict
         Initial configuration to take and replace parameters to vary in
-    variations: List
-        List of Tuples describing what to vary. An entry in the list
-        must look like ('parameter_name', [1, 2, 3])
+    variation_dict: Dict
+        Dictionary defining the variable to be varied. The keyword is the variable name,
+        the value must be a list/array-like, e.g. {'particle_number': [1, 2, 3]}
     per_combination: int=1
         Number of configurations per parameter set (It may be useful to repeat
         the generation of a specific parameter set because particles are randomly
@@ -643,8 +655,6 @@ def build_ConfigManager(initial_cfg: Dict,
         Shuffle the config files. Default is True.
 
     """
-
-    variation_dict = {n: v for n, v in variations}
 
     # if variation has a float entry, make it a list:
     for k, v in variation_dict.items():
