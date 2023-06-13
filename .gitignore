@@ -30,7 +30,6 @@ testdata
 *.par
 *.pth
 *.h5
-*.yaml
 *.env
 *.xml
 *.iml
@@ -40,3 +39,6 @@ testdata
 *.hdf
 *.hdf5
 .pylintrc
+
+*/default.yaml
+default.yaml
