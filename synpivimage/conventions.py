@@ -14,7 +14,7 @@ class StandardNameTranslation:
 
     def __new__(cls, *args, **kwargs) -> StandardNameTableTranslation:
         return StandardNameTableTranslation.from_yaml(
-            __this_dir__ / 'synpivimage-to-particle_image_velocimetry-v1.yml'
+            __this_dir__ / 'standard_name_translation.yaml'
         )
 
 

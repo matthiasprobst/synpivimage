@@ -1,22 +1,28 @@
 """Core module"""
-import h5py
 import itertools
 import multiprocessing as mp
-import numpy as np
 import os
+import pathlib
 import random
 import warnings
-import xarray as xr
-import yaml
 from dataclasses import dataclass
 from math import ceil
-from pathlib import Path
+import pathlib
+from typing import Dict, List, Union, Tuple
+
+import h5py
+import numpy as np
+import xarray as xr
+import yaml
 from scipy.ndimage import gaussian_filter
 from tqdm import tqdm
-from typing import Dict, List, Union, Tuple
 
 from ._version import __version__
 from .noise import add_camera_noise
+
+__this_dir__ = pathlib.Path(__file__).parent
+
+SNT_FILENAME = __this_dir__ / 'standard_name_translation.yaml'
 
 try:
     import h5rdmtoolbox as h5tbx
@@ -26,9 +32,7 @@ except ImportError as e:
     h5tbx_is_available = False
 
 if h5tbx_is_available:
-    from .conventions import StandardNameTranslation
-
-    h5tbx.use('cflike')
+    h5tbx.use('h5py')
 
 np.random.seed()
 CPU_COUNT = mp.cpu_count()
@@ -378,6 +382,20 @@ def _generate(cfgs: List[Dict], nproc: int) -> Tuple[np.ndarray, List[Dict], Lis
             return intensities, attrs_ls, particle_information
 
 
+def apply_standard_names(h5: h5py.Group, standard_name_translation_filename):
+    standard_name_translation_filename = pathlib.Path(standard_name_translation_filename)
+    if not standard_name_translation_filename.exists():
+        raise FileExistsError(f'File not found: {standard_name_translation_filename}')
+
+    with open(standard_name_translation_filename, 'r') as f:
+        snt_translation_dict = yaml.safe_load(f)
+
+    for name, ds in h5.items():
+        if isinstance(ds, h5py.Dataset):
+            if name.strip('/') in snt_translation_dict:
+                ds.attrs['standard_name'] = snt_translation_dict[name.strip('/')]
+
+
 @dataclass
 class ConfigManager:
     """Configuration class which manages creation of images and labels from one or multiple configurations"""
@@ -408,7 +426,7 @@ class ConfigManager:
                  create_labels: bool = True,
                  overwrite: bool = False, nproc: int = CPU_COUNT,
                  compression: str = 'gzip', compression_opts: int = 5,
-                 n_split: int = 10000) -> List[Path]:
+                 n_split: int = 10000) -> List[pathlib.Path]:
         """returns the generated data (intensities and particle information)
         This will not return all particle image information. Only number of particles!"""
         return self._generate_and_store_in_hdf(data_directory,
@@ -419,7 +437,7 @@ class ConfigManager:
                                                compression_opts,
                                                n_split)
 
-    def to_hdf(self, *args, **kwargs) -> List[Path]:
+    def to_hdf(self, *args, **kwargs) -> List[pathlib.Path]:
         """deprecated method --> generate()"""
         warnings.warn('The method "to_hdf" is deprecated. Use "generate" instead', DeprecationWarning)
         return self.generate(*args, **kwargs)
@@ -428,7 +446,7 @@ class ConfigManager:
                                    create_labels: bool = True,
                                    overwrite: bool = False, nproc: int = CPU_COUNT,
                                    compression: str = 'gzip', compression_opts: int = 5,
-                                   n_split: int = 10000) -> List[Path]:
+                                   n_split: int = 10000) -> List[pathlib.Path]:
         """
         Generates the images and writes data in chunks to multiple files according to chunking.
         Besides, the generated image, the following meta information are also stored with the intention
@@ -463,7 +481,7 @@ class ConfigManager:
         -------
         List of filenames
         """
-        _dir = Path(data_directory)
+        _dir = pathlib.Path(data_directory)
         _ds_filenames = list(_dir.glob('ds*.hdf'))
         if len(_ds_filenames) > 0 and not overwrite:
             raise FileExistsError(f'File exists and overwrite is False')
@@ -625,8 +643,7 @@ class ConfigManager:
 
                 if h5tbx_is_available:
                     print('Processing standard names...')
-                    sntr = StandardNameTranslation()
-                    sntr.translate_group(h5)
+                    apply_standard_names(h5, SNT_FILENAME)
                 print('... done.')
         return filenames
 
