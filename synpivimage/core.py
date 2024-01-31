@@ -13,6 +13,7 @@ import h5py
 import numpy as np
 import xarray as xr
 import yaml
+from pydantic import BaseModel
 from scipy.ndimage import gaussian_filter
 from tqdm import tqdm
 
@@ -40,30 +41,129 @@ default_yaml_file: str = 'default.yaml'
 
 PMIN_ALLOWED: float = 0.1
 
+
 # default config has no noise since it can be added afterwards, too
-DEFAULT_CFG = {'ny': 128,
-               'nx': 128,
-               'square_image': True,
-               'bit_depth': 16,
-               'noise_baseline': 0.0,
-               'dark_noise': 0.0,  # 'noise_baseline': 20, 'dark_noise': 2.29,
-               'sensitivity': 1,
-               'qe': 1,
-               'shot_noise': False,
-               'particle_number': 1,
-               'particle_size_mean': 2.5,
-               'particle_size_std': 0.25,
-               'laser_width': 3,
-               'laser_shape_factor': 2,
-               'sensor_gain': 1.0,  # a particle hit by max laser intensity will show max count on the sensor
-               # 'laser_max_intensity': 1000
-               'particle_position_file': None,
-               'particle_size_illumination_dependency': True
-               }
+
+class SynPivConfig(BaseModel):
+    ny: int
+    nx: int
+    square_image: bool = True
+    bit_depth: int = 16
+    noise_baseline: float = 0.0
+    dark_noise: float = 0.0  # noise_baseline: 20, dark_noise: 2.29,
+    shot_noise: bool = False
+    sensitivity: float = 1.
+    qe: float = 1.
+    particle_number: int = 1
+    particle_size_mean: float = 2.5
+    particle_size_std: float = 0.25
+    laser_width: int = 3
+    laser_shape_factor: int = 2
+    sensor_gain: int = 1.0  # a particle hit by max laser intensity will show max count on the sensor
+    # laser_max_intensity: 1000
+    particle_position_file: Union[str, pathlib.Path, None] = None
+    particle_size_illumination_dependency: bool = True
+
+    def __getitem__(self, item):
+        warnings.warn(f'Please use .{item}', DeprecationWarning)
+        if hasattr(self, item):
+            return getattr(self, item)
+        raise KeyError(f'invalid key: {item}')
+
+    def __setitem__(self, key, value):
+        warnings.warn(f'Please item assigment: {key}={value}', DeprecationWarning)
+        setattr(self, key, value)
+
+
+DEFAULT_CFG = SynPivConfig(
+    ny=128,
+    nx=128
+)
+
+
+# DEFAULT_CFG = ConfigParser()
+# DEFAULT_CFG.read_dict(
+#     dictionary={
+#         'ny': 128,
+#         'nx': 128,
+#         'square_image': True,
+#         'bit_depth': 16,
+#         'noise_baseline': 0.0,
+#         'dark_noise': 0.0,  # 'noise_baseline': 20, 'dark_noise': 2.29,
+#         'sensitivity': 1,
+#         'qe': 1,
+#         'shot_noise': False,
+#         'particle_number': 1,
+#         'particle_size_mean': 2.5,
+#         'particle_size_std': 0.25,
+#         'laser_width': 3,
+#         'laser_shape_factor': 2,
+#         'sensor_gain': 1.0,  # a particle hit by max laser intensity will show max count on the sensor
+#         # 'laser_max_intensity': 1000
+#         'particle_position_file': None,
+#         'particle_size_illumination_dependency': True
+#     }
+# )
+
+@dataclass
+class ParticleInfo:
+    """Dataclass holding particle position, size and intensity information"""
+    x: np.ndarray
+    y: np.ndarray
+    z: np.ndarray
+    size: np.ndarray
+    intensity: Union[np.ndarray, None] = None
+
+    def __post_init__(self):
+        assert len(self.x) == len(self.y)
+        assert len(self.x) == len(self.z)
+        assert len(self.x) == len(self.size)
+        if self.intensity is not None:
+            assert len(self.x) == len(self.intensity)
+
+    @classmethod
+    def from_hdf(cls, hdf_filename) -> List["ParticleInfo"]:
+        """Init the class based on a HDF5 file. Expecting the particle infos to be located in
+        group 'particle_infos'"""
+        part_infos = []
+        if isinstance(hdf_filename, list):
+            for _hdf_filename in hdf_filename:
+                part_infos.extend(cls.from_hdf(_hdf_filename))
+            return part_infos
+
+        with h5tbx.File(hdf_filename) as h5:
+            grp_part_info = h5['particle_infos']
+            for k, v in grp_part_info.items():
+                x = v['x'][()]
+                y = v['y'][()]
+                z = v['z'][()]
+                size = v['size'][()]
+                intensity = v['intensity'][()]
+                part_infos.append(cls(x=x, y=y, z=z, size=size, intensity=intensity))
+
+        return part_infos
+
+    def displace(self, dx=None, dy=None, dz=None):
+        """Displace the particles"""
+        if dx is not None:
+            if isinstance(dx, (int, float)):
+                self.x += dx
+            else:
+                self.x += np.array(dx)
+        if dy is not None:
+            if isinstance(dy, (int, float)):
+                self.y += dy
+            else:
+                self.y += np.array(dy)
+        if dz is not None:
+            if isinstance(dz, (int, float)):
+                self.z += dz
+            else:
+                self.z += np.array(dz)
 
 
 def particle_location_from_file(filename: str) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    """Read particle loaction from file. Expected content (not checked) is
+    """Read particle location from file. Expected content (not checked) is
     comma separated with a header line
     #x, y, z, dp
      1, 0, 0, 2
@@ -78,17 +178,19 @@ def particle_location_from_file(filename: str) -> Tuple[np.ndarray, np.ndarray, 
     return xp, yp, zp, dp
 
 
-def process_config_for_particle_position(cfg: Dict):
+def process_config_for_particle_position(cfg: SynPivConfig):
     """Process the config dictionary and return particle property (position + size)"""
-    if cfg['particle_position_file'] is None:
+    if not isinstance(cfg, SynPivConfig):
+        raise TypeError(f'configuration must by SynPivConfig, not {type(cfg)}')
+    if cfg.particle_position_file is None:
         return None
     xp, yp, zp, dp = particle_location_from_file(cfg['particle_position_file'])
     # update some config data:
-    cfg['particle_number'] = len(xp)
-    cfg['particle_size_mean'] = np.mean(dp)
-    cfg['particle_size_std'] = np.std(dp)
+    cfg.particle_number = len(xp)
+    cfg.particle_size_mean = np.mean(dp)
+    cfg.particle_size_std = np.std(dp)
     pposdict = dict(x=xp, y=yp, z=zp, size=dp)
-    return pposdict
+    return ParticleInfo(**pposdict)
 
 
 def write_yaml_file(filename: Union[str, bytes, os.PathLike], data: dict):
@@ -115,7 +217,10 @@ def read_config(filename: Union[str, bytes, os.PathLike]) -> Dict:
     return yaml2dict(filename)
 
 
-def generate_image(config_or_yaml: Dict or str, particle_data: dict = None, **kwargs) -> Tuple[np.ndarray, Dict, Dict]:
+def generate_image(
+        config: SynPivConfig,
+        particle_data: Union[ParticleInfo, None] = None,
+        **kwargs) -> Tuple[np.ndarray, Dict, ParticleInfo]:
     """
     Generates a particle image based on a config (file). The generated image and the
     particle data as a dictionary is returned.
@@ -124,15 +229,21 @@ def generate_image(config_or_yaml: Dict or str, particle_data: dict = None, **kw
     In the latter case, the density
     set in the config is ignored
     """
-    if isinstance(config_or_yaml, dict):
-        config = config_or_yaml
+    if isinstance(config, dict):
+        config = SynPivConfig(**config)
+    elif isinstance(config, SynPivConfig):
+        warnings.warn('Please provide a SynPivConfig object',
+                      DeprecationWarning)
+        config = config
     else:
-        config = yaml2dict(config_or_yaml)
+        warnings.warn('Please provide a SynPivConfig object',
+                      DeprecationWarning)
+        config = yaml2dict(config)
 
     # read and process configuration:
     if config['square_image']:
-        config['ny'] = config['nx']
-    image_shape = (config['ny'], config['nx'])
+        config.ny = config.nx
+    image_shape = (config.ny, config.nx)
     image_size = image_shape[0] * image_shape[1]
 
     sensitivity = config['sensitivity']
@@ -144,10 +255,10 @@ def generate_image(config_or_yaml: Dict or str, particle_data: dict = None, **kw
     bit_depth = config['bit_depth']
 
     if particle_data is not None:
-        xp = particle_data['x']
-        yp = particle_data['y']
-        zp = particle_data['z']
-        particle_sizes = particle_data['size']
+        xp = particle_data.x
+        yp = particle_data.y
+        zp = particle_data.z
+        particle_sizes = particle_data.size
         if any(_arg is not None for _arg in (xp, yp, zp, particle_sizes)):
             if not all(_arg is not None for _arg in (xp, yp, zp, particle_sizes)):
                 raise ValueError('If particle properties are set manually, all (xp, yp, zp and size)'
@@ -183,8 +294,8 @@ def generate_image(config_or_yaml: Dict or str, particle_data: dict = None, **kw
                              f'{config["particle_number"]}')
         n_particles = int(config['particle_number'])
         assert n_particles > 0
-        pmean = config['particle_size_mean']  # mean particle size
-        pstd = config['particle_size_std']  # standard deviation of particle size
+        pmean = config.particle_size_mean  # mean particle size
+        pstd = config.particle_size_std  # standard deviation of particle size
         pmin = pmean - 3 * pstd  # min particle size is 3*sigma below mean psize
         if pmin < PMIN_ALLOWED:
             warnings.warn(f'Particles smaller then {PMIN_ALLOWED} are set to {PMIN_ALLOWED}.')
@@ -231,7 +342,7 @@ def generate_image(config_or_yaml: Dict or str, particle_data: dict = None, **kw
         part_intensity = part_intensity / (np.pi * max(particle_sizes) ** 2 / 8)
     else:
         part_intensity = particle_intensity(zp, dz0, s)
-    part_intensity = part_intensity * q * config['sensor_gain']
+    part_intensity = part_intensity * q * config.sensor_gain
     ny, nx = image_shape
     # nsigma = 4
     for x, y, psize, pint in zip(xp, yp, particle_sizes, part_intensity):
@@ -275,15 +386,16 @@ def generate_image(config_or_yaml: Dict or str, particle_data: dict = None, **kw
              'laser_width': dz0,
              'laser_shape_factor': s,
              'laser_max_intensity': q,
-             'particle_size_mean': config['particle_size_mean'],
-             'particle_size_std': config['particle_size_std'],
-             'sensor_gain': config['sensor_gain'],
+             'particle_size_mean': config.particle_size_mean,
+             'particle_size_std': config.particle_size_std,
+             'sensor_gain': config.sensor_gain,
              'code_source': 'https://git.scc.kit.edu/da4323/piv-particle-density',
              'version': __version__}
 
-    return _intensity.astype(int), attrs, {'x': xp, 'y': yp, 'z': zp,
-                                           'size': particle_sizes,
-                                           'intensity': part_intensity}
+    particle_info = ParticleInfo(**{'x': xp, 'y': yp, 'z': zp,
+                                    'size': particle_sizes,
+                                    'intensity': part_intensity})
+    return _intensity.astype(int), attrs, particle_info
 
 
 def _compute_max_z_position_from_laser_properties(dz0: float, s: int) -> float:
@@ -324,10 +436,10 @@ def particle_intensity(z: np.ndarray, dz0: float, s: int, dp: np.ndarray = None)
 
 
 def _generate(
-        cfgs: List[Dict],
+        cfgs: List[SynPivConfig],
         nproc: int,
-        particle_information: Union[List[Dict], Dict, None]
-) -> Tuple[np.ndarray, List[Dict], List[Dict]]:
+        particle_information: Union[ParticleInfo, None]
+) -> Tuple[np.ndarray, List[Dict], List[ParticleInfo]]:
     """Generates the particle image(s) and returns those alongside with the particle
     information hidden in the image(s)
 
@@ -349,7 +461,7 @@ def _generate(
         List of dictionary with the information like particle position, size, ... for the
         generated images
     """
-    if isinstance(cfgs, Dict):
+    if isinstance(cfgs, SynPivConfig):
         cfgs = [cfgs, ]
 
     if nproc > CPU_COUNT:
@@ -358,16 +470,17 @@ def _generate(
         _nproc = CPU_COUNT
     else:
         _nproc = nproc
-    if cfgs[0]['square_image']:
-        cfgs[0]['ny'] = cfgs[0]['nx']
-    intensities = np.empty(shape=(len(cfgs), cfgs[0]['ny'], cfgs[0]['nx']))
+    if cfgs[0].square_image:
+        cfgs[0].ny = cfgs[0].nx
+    intensities = np.empty(shape=(len(cfgs), cfgs[0].ny, cfgs[0].nx))
     # intensities = xr.DataArray(name='intensity', dims=('y', 'x'),
-    #                            data=np.empty(shape=(len(cfgs), cfgs[0]['ny'], cfgs[0]['nx'])))
+    #                            data=np.empty(shape=(len(cfgs), cfgs[0].ny, cfgs[0].nx)))
 
     generate_particle_positions = particle_information is None
     particle_information_out = []
 
-    assert isinstance(particle_information, (list, dict))
+    if particle_information is not None:
+        assert isinstance(particle_information, (list, ParticleInfo))
     if isinstance(particle_information, list):
         assert len(particle_information) == len(cfgs)
 
@@ -427,7 +540,7 @@ def apply_standard_names(h5: h5py.Group, standard_name_translation_filename):
 @dataclass
 class ConfigManager:
     """Configuration class which manages creation of images and labels from one or multiple configurations"""
-    cfgs: Dict
+    cfgs: Tuple[Dict]
 
     def __post_init__(self):
         if isinstance(self.cfgs, Dict):
@@ -452,7 +565,9 @@ class ConfigManager:
 
     def generate(self,
                  data_directory: Union[str, bytes, os.PathLike],
-                 particle_info: Union[List[Dict], Dict, None] = None,
+                 particle_info: Union[ParticleInfo, List[ParticleInfo], None] = None,
+                 prefix='ds',
+                 suffix='.hdf',
                  create_labels: bool = True,
                  overwrite: bool = False,
                  nproc: int = CPU_COUNT,
@@ -463,6 +578,8 @@ class ConfigManager:
         This will not return all particle image information. Only number of particles!"""
         return self._generate_and_store_in_hdf(data_directory=data_directory,
                                                particle_info=particle_info,
+                                               prefix=prefix,
+                                               suffix=suffix,
                                                create_labels=create_labels,
                                                overwrite=overwrite,
                                                nproc=nproc,
@@ -478,7 +595,9 @@ class ConfigManager:
     def _generate_and_store_in_hdf(self,
                                    *,
                                    data_directory: Union[str, bytes, os.PathLike],
-                                   particle_info: Union[List[Dict], Dict, None] = None,
+                                   prefix='ds',
+                                   suffix='.hdf',
+                                   particle_info: Union[List[ParticleInfo], ParticleInfo, None] = None,
                                    create_labels: bool = True,
                                    overwrite: bool = False,
                                    nproc: int = CPU_COUNT,
@@ -495,7 +614,7 @@ class ConfigManager:
         - intensity mean
         - intensity std
 
-        Files are stored in data_directory and are named ds_XXXXXX.hdf where XXXXXX is the index of
+        Files are stored in data_directory and are named <prefix>XXXXXX<suffix> where XXXXXX is the index of
         the file.
 
         Parameters
@@ -520,7 +639,8 @@ class ConfigManager:
         List of filenames
         """
         _dir = pathlib.Path(data_directory)
-        _ds_filenames = list(_dir.glob('ds*.hdf'))
+        _ds_filenames = list(_dir.glob(f'{prefix}*{suffix}'))
+
         if len(_ds_filenames) > 0 and not overwrite:
             raise FileExistsError(f'File exists and overwrite is False')
         elif len(_ds_filenames) > 0 and overwrite:
@@ -548,7 +668,7 @@ class ConfigManager:
             images, attrs, particle_information = _generate(cfg_chunk, nproc, particle_info)
             assert images.shape[0] == len(particle_information)
             assert images.shape[0] == len(attrs)
-            new_name = f'ds_{i_chunk:06d}.hdf'
+            new_name = f'{prefix}_{i_chunk:06d}{suffix}'
             new_filename = _dir.joinpath(new_name)
             filenames.append(new_filename)
             n_ds, ny, nx = images.shape
@@ -650,18 +770,18 @@ class ConfigManager:
                 ds_laser_width[:] = [a['laser_width'] for a in attrs]
 
                 ds_images[:] = images
-                ds_labels[:] = np.stack([generate_label(p_info['x'],
-                                                        p_info['y'],
+                ds_labels[:] = np.stack([generate_label(p_info.x,
+                                                        p_info.y,
                                                         images.shape[1:],
                                                         False) for p_info in particle_information])
                 assert ds_labels.shape == images.shape
-                npart = np.asarray([len(p['x']) for p in particle_information])
+                npart = np.asarray([len(p.x) for p in particle_information])
                 ds_nparticles[:] = npart
                 ds_particle_density[:] = npart / (nx * ny)
-                ds_mean_size[:] = [np.mean(p['size']) for p in particle_information]
+                ds_mean_size[:] = [np.mean(p.size) for p in particle_information]
                 ds_configured_mean_size[:] = [a['particle_size_mean'] for a in attrs]
                 ds_configured_std_size[:] = [a['particle_size_std'] for a in attrs]
-                ds_std_size[:] = [np.std(p['size']) for p in particle_information]
+                ds_std_size[:] = [np.std(p.size) for p in particle_information]
                 # ds_intensity_mean[:] = [np.mean(p['intensity']) for p in particle_information]
                 # ds_intensity_std[:] = [np.std(p['intensity']) for p in particle_information]
                 ds_bitdepth[:] = [a['bit_depth'] for a in attrs]
@@ -669,8 +789,11 @@ class ConfigManager:
                 part_pos_grp = h5.create_group('particle_infos')
                 for ipart, part_info in enumerate(particle_information):
                     grp = part_pos_grp.create_group(f'image_{ipart:06d}')
-                    for k, v in part_info.items():
-                        grp.create_dataset(k, data=v)
+                    grp.create_dataset('x', data=part_info.x)
+                    grp.create_dataset('y', data=part_info.y)
+                    grp.create_dataset('z', data=part_info.z)
+                    grp.create_dataset('size', data=part_info.size)
+                    grp.create_dataset('intensity', data=part_info.intensity)
 
                 for ds in (ds_imageindex, ds_nparticles, ds_mean_size, ds_std_size,
                            # ds_intensity_mean, ds_intensity_std,
@@ -735,7 +858,7 @@ def build_ConfigManager(*,
             for k, v in param_dict.items():
                 cfgs[-1][k] = v
                 # a raw filename without extension to the dictionary:
-            cfgs[-1]['fname'] = f'ds{count:06d}'
+            # cfgs[-1]['fname'] = f'ds{count:06d}'
             count += 1
     if shuffle:
         random.shuffle(cfgs)
