@@ -22,7 +22,7 @@ To install `pytest` in order to run test optional dependencies must be installed
 py -m pip install -e ".[test]"
 ```
 
-Then, excute `pytest` in the reposiory directory:
+Then, execute `pytest` in the repository directory:
 
 ```bash
 pytest
@@ -31,7 +31,7 @@ pytest
 ## Quick introduction
 
 To generate synthetic particle images, configure a `ConfigManager`. It take the parameters and take care of generating
-and writing the data to an `HDF5` file. For more explanaition follow the
+and writing the data to an `HDF5` file. For more explanation follow the
 example `jupyter notebook` [here](./examples/generate_datasets.ipynb).
 
 ```python
