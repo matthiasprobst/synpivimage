@@ -323,10 +323,11 @@ def particle_intensity(z: np.ndarray, dz0: float, s: int, dp: np.ndarray = None)
     return np.exp(-1 / np.sqrt(2 * np.pi) * np.abs(2 * z ** 2 / dz0 ** 2) ** s) * dp ** 2 * np.pi / 8
 
 
-def _generate(cfgs: List[Dict],
-              nproc: int,
-              particle_information: Union[List[Dict], Dict, None]) -> Tuple[
-    np.ndarray, List[Dict], List[Dict]]:
+def _generate(
+        cfgs: List[Dict],
+        nproc: int,
+        particle_information: Union[List[Dict], Dict, None]
+) -> Tuple[np.ndarray, List[Dict], List[Dict]]:
     """Generates the particle image(s) and returns those alongside with the particle
     information hidden in the image(s)
 
@@ -372,8 +373,7 @@ def _generate(cfgs: List[Dict],
 
     attrs_ls = []
     if _nproc < 2:
-        idx = 0
-        for _cfg in tqdm(cfgs, total=len(cfgs), unit='cfg dict'):
+        for idx, _cfg in tqdm(enumerate(cfgs), total=len(cfgs), unit='cfg dict'):
             if generate_particle_positions:
                 particle_data = process_config_for_particle_position(_cfg)
             else:
@@ -386,12 +386,22 @@ def _generate(cfgs: List[Dict],
             intensities[idx, ...] = _intensity
             attrs_ls.append(_attrs)
             particle_information_out.append(_partpos)
-            idx += 1
         return intensities, attrs_ls, particle_information_out
     else:
         with mp.Pool(processes=_nproc) as pool:
-            results = [pool.apply_async(generate_image, args=(_cfg, process_config_for_particle_position(_cfg))) for
-                       _cfg in cfgs]
+            if generate_particle_positions:
+                results = [pool.apply_async(
+                    generate_image,
+                    args=(_cfg, process_config_for_particle_position(_cfg))) for
+                    _cfg in cfgs]
+            else:
+                if isinstance(particle_information, list):
+                    results = [pool.apply_async(generate_image, args=(_cfg, particle_information[idx])) for
+                               idx, _cfg in enumerate(cfgs)]
+                else:
+                    results = [pool.apply_async(generate_image, args=(_cfg, particle_information)) for
+                               _cfg in cfgs]
+
             for i, r in tqdm(enumerate(results), total=len(results)):
                 intensity, _attrs, particle_meta = r.get()
                 intensities[i, ...] = intensity
@@ -470,8 +480,10 @@ class ConfigManager:
                                    data_directory: Union[str, bytes, os.PathLike],
                                    particle_info: Union[List[Dict], Dict, None] = None,
                                    create_labels: bool = True,
-                                   overwrite: bool = False, nproc: int = CPU_COUNT,
-                                   compression: str = 'gzip', compression_opts: int = 5,
+                                   overwrite: bool = False,
+                                   nproc: int = CPU_COUNT,
+                                   compression: str = 'gzip',
+                                   compression_opts: int = 5,
                                    n_split: int = 10000) -> List[pathlib.Path]:
         """
         Generates the images and writes data in chunks to multiple files according to chunking.
