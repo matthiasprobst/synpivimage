@@ -7,7 +7,6 @@ import random
 import warnings
 from dataclasses import dataclass
 from math import ceil
-import pathlib
 from typing import Dict, List, Union, Tuple
 
 import h5py
@@ -324,7 +323,10 @@ def particle_intensity(z: np.ndarray, dz0: float, s: int, dp: np.ndarray = None)
     return np.exp(-1 / np.sqrt(2 * np.pi) * np.abs(2 * z ** 2 / dz0 ** 2) ** s) * dp ** 2 * np.pi / 8
 
 
-def _generate(cfgs: List[Dict], nproc: int) -> Tuple[np.ndarray, List[Dict], List[Dict]]:
+def _generate(cfgs: List[Dict],
+              nproc: int,
+              particle_information: Union[List[Dict], Dict, None]) -> Tuple[
+    np.ndarray, List[Dict], List[Dict]]:
     """Generates the particle image(s) and returns those alongside with the particle
     information hidden in the image(s)
 
@@ -334,6 +336,9 @@ def _generate(cfgs: List[Dict], nproc: int) -> Tuple[np.ndarray, List[Dict], Lis
         List of configuration to be passed to `generate_image`
     nproc: int, default=CPU_COUNT
         Number of processors to be used to generate the data
+    particle_information: Union[List[Dict], Dict, None]
+        List of dictionaries with the particle information. If None, the particle information
+        will be generated randomly withing the configuration range
 
     Returns
     -------
@@ -357,19 +362,32 @@ def _generate(cfgs: List[Dict], nproc: int) -> Tuple[np.ndarray, List[Dict], Lis
     intensities = np.empty(shape=(len(cfgs), cfgs[0]['ny'], cfgs[0]['nx']))
     # intensities = xr.DataArray(name='intensity', dims=('y', 'x'),
     #                            data=np.empty(shape=(len(cfgs), cfgs[0]['ny'], cfgs[0]['nx'])))
-    particle_information = []
+
+    generate_particle_positions = particle_information is None
+    particle_information_out = []
+
+    assert isinstance(particle_information, (list, dict))
+    if isinstance(particle_information, list):
+        assert len(particle_information) == len(cfgs)
+
     attrs_ls = []
     if _nproc < 2:
         idx = 0
         for _cfg in tqdm(cfgs, total=len(cfgs), unit='cfg dict'):
-            particle_data = process_config_for_particle_position(_cfg)
+            if generate_particle_positions:
+                particle_data = process_config_for_particle_position(_cfg)
+            else:
+                if isinstance(particle_information, list):
+                    particle_data = particle_information[idx]
+                else:
+                    particle_data = particle_information
 
             _intensity, _attrs, _partpos = generate_image(_cfg, particle_data=particle_data)
             intensities[idx, ...] = _intensity
             attrs_ls.append(_attrs)
-            particle_information.append(_partpos)
+            particle_information_out.append(_partpos)
             idx += 1
-        return intensities, attrs_ls, particle_information
+        return intensities, attrs_ls, particle_information_out
     else:
         with mp.Pool(processes=_nproc) as pool:
             results = [pool.apply_async(generate_image, args=(_cfg, process_config_for_particle_position(_cfg))) for
@@ -378,8 +396,8 @@ def _generate(cfgs: List[Dict], nproc: int) -> Tuple[np.ndarray, List[Dict], Lis
                 intensity, _attrs, particle_meta = r.get()
                 intensities[i, ...] = intensity
                 attrs_ls.append(_attrs)
-                particle_information.append(particle_meta)
-            return intensities, attrs_ls, particle_information
+                particle_information_out.append(particle_meta)
+            return intensities, attrs_ls, particle_information_out
 
 
 def apply_standard_names(h5: h5py.Group, standard_name_translation_filename):
@@ -422,27 +440,35 @@ class ConfigManager:
                                    per_combination=per_combination,
                                    shuffle=shuffle)
 
-    def generate(self, data_directory: Union[str, bytes, os.PathLike],
+    def generate(self,
+                 data_directory: Union[str, bytes, os.PathLike],
+                 particle_info: Union[List[Dict], Dict, None] = None,
                  create_labels: bool = True,
-                 overwrite: bool = False, nproc: int = CPU_COUNT,
-                 compression: str = 'gzip', compression_opts: int = 5,
+                 overwrite: bool = False,
+                 nproc: int = CPU_COUNT,
+                 compression: str = 'gzip',
+                 compression_opts: int = 5,
                  n_split: int = 10000) -> List[pathlib.Path]:
         """returns the generated data (intensities and particle information)
         This will not return all particle image information. Only number of particles!"""
-        return self._generate_and_store_in_hdf(data_directory,
-                                               create_labels,
-                                               overwrite,
-                                               nproc,
-                                               compression,
-                                               compression_opts,
-                                               n_split)
+        return self._generate_and_store_in_hdf(data_directory=data_directory,
+                                               particle_info=particle_info,
+                                               create_labels=create_labels,
+                                               overwrite=overwrite,
+                                               nproc=nproc,
+                                               compression=compression,
+                                               compression_opts=compression_opts,
+                                               n_split=n_split)
 
     def to_hdf(self, *args, **kwargs) -> List[pathlib.Path]:
         """deprecated method --> generate()"""
         warnings.warn('The method "to_hdf" is deprecated. Use "generate" instead', DeprecationWarning)
         return self.generate(*args, **kwargs)
 
-    def _generate_and_store_in_hdf(self, data_directory: Union[str, bytes, os.PathLike],
+    def _generate_and_store_in_hdf(self,
+                                   *,
+                                   data_directory: Union[str, bytes, os.PathLike],
+                                   particle_info: Union[List[Dict], Dict, None] = None,
                                    create_labels: bool = True,
                                    overwrite: bool = False, nproc: int = CPU_COUNT,
                                    compression: str = 'gzip', compression_opts: int = 5,
@@ -507,7 +533,7 @@ class ConfigManager:
 
         filenames = []
         for i_chunk, cfg_chunk in enumerate(chunked_cfgs):
-            images, attrs, particle_information = _generate(cfg_chunk, nproc)
+            images, attrs, particle_information = _generate(cfg_chunk, nproc, particle_info)
             assert images.shape[0] == len(particle_information)
             assert images.shape[0] == len(attrs)
             new_name = f'ds_{i_chunk:06d}.hdf'
@@ -648,9 +674,11 @@ class ConfigManager:
         return filenames
 
 
-def build_ConfigManager(initial_cfg: Dict,
+def build_ConfigManager(*,
+                        initial_cfg: Dict,
                         variation_dict: Dict,
-                        per_combination: int = 1, shuffle: bool = True) -> ConfigManager:
+                        per_combination: int = 1,
+                        shuffle: bool = True) -> ConfigManager:
     """Generates a list of configuration dictionaries.
     Request an initial configuration and a tuple of variable length containing
     the name of a dictionary key of the configuration and the values to be chosen.

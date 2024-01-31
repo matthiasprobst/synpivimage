@@ -1,12 +1,19 @@
-import h5py
-import numpy as np
 import pathlib
 import unittest
-import warnings
+
+import h5rdmtoolbox as h5tbx
+import matplotlib.pyplot as plt
+# import h5py
+import numpy as np
 
 from synpivimage import DEFAULT_CFG
 from synpivimage import build_ConfigManager
-from synpivimage.conventions import Layout
+
+
+# import warnings
+
+
+# from synpivimage.conventions import Layout
 
 
 class TestCore(unittest.TestCase):
@@ -75,3 +82,27 @@ class TestCore(unittest.TestCase):
         h5l.check_file(hdf_filename)
         self.assertEqual(h5l.n_issues, 0)
         h5l.report()
+
+    def test_generate_second_image(self):
+        cfg = DEFAULT_CFG
+        cfg['nx'] = 16
+        cfg['ny'] = 16
+        cfg['laser_width'] = 2
+        particle_numbers = np.linspace(1, cfg['ny'] * cfg['nx'], 5).astype(int)
+        CFG = build_ConfigManager(initial_cfg=cfg,
+                                  variation_dict={'particle_number': particle_numbers},
+                                  per_combination=1)
+
+        # with h5tbx.File(hdf_filenames[0]) as h5:
+        #     get x,y,z,size from hdf file and feed to to image B generation
+
+        hdf_filenames = CFG.generate(
+            data_directory='.',
+            nproc=1,
+            particle_info={'x': [8, 9, 10, 11, 12],
+                           'y': [8, 8, 8, 8, 8],
+                           'z': [0, -0.5, -1, -1.5, -2],
+                           'size': [2.5, 2.5, 2.5, 2.5, 2.5]})
+        with h5tbx.File(hdf_filenames[0]) as h5:
+            h5.images[0, ...].plot()
+        plt.show()
