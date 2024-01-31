@@ -666,6 +666,12 @@ class ConfigManager:
                 # ds_intensity_std[:] = [np.std(p['intensity']) for p in particle_information]
                 ds_bitdepth[:] = [a['bit_depth'] for a in attrs]
 
+                part_pos_grp = h5.create_group('particle_infos')
+                for ipart, part_info in enumerate(particle_information):
+                    grp = part_pos_grp.create_group(f'image_{ipart:06d}')
+                    for k, v in part_info.items():
+                        grp.create_dataset(k, data=v)
+
                 for ds in (ds_imageindex, ds_nparticles, ds_mean_size, ds_std_size,
                            # ds_intensity_mean, ds_intensity_std,
                            ds_laser_width, ds_laser_shape_factor, ds_n_satpx,
