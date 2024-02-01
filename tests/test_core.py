@@ -134,17 +134,74 @@ class TestCore(unittest.TestCase):
         cfg.ny = 16
         cfg.laser_width = 2
         cfg.particle_number = 5
+        cfg.qe = 1
+        cfg.dark_noise = 0
+        cfg.noise_baseline = 0
+        cfg.sensitivity = 1
+        cfg.relative_laser_intensity = 1  # 1000/(2**cfg.bit_depth)
+
         imgA, attrsA, part_infoA = generate_image(
             cfg,
-            particle_data=None
+            particle_data=synpivimage.ParticleInfo(x=8, y=8, z=0, size=2.5)
         )
-        part_infoA.displace(dx=2, dy=1, dz=-1)
-        imgB, attrsB, part_infoB = generate_image(
+        self.assertEqual(imgA.max(), 2 ** cfg.bit_depth-1)
+
+        cfg.qe = 0.25
+
+        imgA, attrsA, part_infoA = generate_image(
             cfg,
-            particle_data=part_infoA
+            particle_data=synpivimage.ParticleInfo(x=8, y=8, z=0, size=2.5)
         )
-        fig, axs = plt.subplots(1, 2)
+        self.assertEqual(imgA.max(), int((2 ** cfg.bit_depth)*cfg.qe))
+
+        cfg.qe = 1
+        cfg.sensitivity = 1/4
+
+        imgA, attrsA, part_infoA = generate_image(
+            cfg,
+            particle_data=synpivimage.ParticleInfo(x=8, y=8, z=0, size=2.5)
+        )
+        self.assertEqual(imgA.max(), int((2 ** cfg.bit_depth)*cfg.sensitivity))
+
+        # max count = 1000
+        cfg.qe = 1
+        cfg.sensitivity = 1
+        cfg.relative_laser_intensity = 1000/(2**cfg.bit_depth)
+
+        imgA, attrsA, part_infoA = generate_image(
+            cfg,
+            particle_data=synpivimage.ParticleInfo(x=8, y=8, z=0, size=2.5)
+        )
+        self.assertEqual(imgA.max(), 1000)
+
+        fig, axs = plt.subplots(1, 1)
         imgAmax = imgA.max()
-        axs[0].imshow(imgA, cmap='gray', vmin=0, vmax=imgAmax)
-        axs[1].imshow(imgB, cmap='gray', vmin=0, vmax=imgAmax)
+        im = axs.imshow(imgA, cmap='gray', vmin=0, vmax=imgAmax)
+        plt.colorbar(im)
         plt.show()
+
+    # def test_create_single_image(self):
+    #     cfg = DEFAULT_CFG
+    #     cfg.nx = 16
+    #     cfg.ny = 16
+    #     cfg.laser_width = 2
+    #     cfg.particle_number = 5
+    #     cfg.qe = 0.25
+    #     cfg.dark_noise = 0
+    #     cfg.noise_baseline = 100
+    #     cfg.relative_laser_intensity = 1000/(2**cfg.bit_depth)
+    #     imgA, attrsA, part_infoA = generate_image(
+    #         cfg,
+    #         particle_data=None
+    #     )
+    #     part_infoA.displace(dx=2, dy=1, dz=-1)
+    #     imgB, attrsB, part_infoB = generate_image(
+    #         cfg,
+    #         particle_data=part_infoA
+    #     )
+    #     fig, axs = plt.subplots(1, 2)
+    #     imgAmax = imgA.max()
+    #     axs[0].imshow(imgA, cmap='gray', vmin=0, vmax=imgAmax)
+    #     im = axs[1].imshow(imgB, cmap='gray', vmin=0, vmax=imgAmax)
+    #     plt.colorbar(im)
+    #     plt.show()

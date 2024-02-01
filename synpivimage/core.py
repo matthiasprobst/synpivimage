@@ -1,24 +1,26 @@
 """Core module"""
-import itertools
 import multiprocessing as mp
 import os
 import pathlib
 import random
 import warnings
 from dataclasses import dataclass
-from math import ceil
-from typing import Dict, List, Union, Tuple
 
 import h5py
+import itertools
 import numpy as np
 import xarray as xr
 import yaml
+from math import ceil
 from pydantic import BaseModel
 from scipy.ndimage import gaussian_filter
 from tqdm import tqdm
+from typing import Dict, List, Union, Tuple
 
+from . import noise
 from ._version import __version__
-from .noise import add_camera_noise
+
+# from .noise import add_camera_noise
 
 __this_dir__ = pathlib.Path(__file__).parent
 
@@ -34,7 +36,6 @@ except ImportError as e:
 if h5tbx_is_available:
     h5tbx.use('h5py')
 
-np.random.seed()
 CPU_COUNT = mp.cpu_count()
 
 default_yaml_file: str = 'default.yaml'
@@ -47,19 +48,19 @@ PMIN_ALLOWED: float = 0.1
 class SynPivConfig(BaseModel):
     ny: int
     nx: int
-    square_image: bool = True
+    square_image: bool
     bit_depth: int = 16
     noise_baseline: float = 0.0
     dark_noise: float = 0.0  # noise_baseline: 20, dark_noise: 2.29,
     shot_noise: bool = False
     sensitivity: float = 1.
-    qe: float = 1.
+    qe: float = 0.25  # quantum efficiency. efficiency of photons to electron conversion
     particle_number: int = 1
     particle_size_mean: float = 2.5
     particle_size_std: float = 0.25
     laser_width: int = 3
     laser_shape_factor: int = 2
-    sensor_gain: int = 1.0  # a particle hit by max laser intensity will show max count on the sensor
+    relative_laser_intensity: int = 1.0  # relative laser intensity to max bit depth
     # laser_max_intensity: 1000
     particle_position_file: Union[str, pathlib.Path, None] = None
     particle_size_illumination_dependency: bool = True
@@ -71,11 +72,12 @@ class SynPivConfig(BaseModel):
         raise KeyError(f'invalid key: {item}')
 
     def __setitem__(self, key, value):
-        warnings.warn(f'Please item assigment: {key}={value}', DeprecationWarning)
+        warnings.warn(f'Please item assignment: {key}={value}', DeprecationWarning)
         setattr(self, key, value)
 
 
 DEFAULT_CFG = SynPivConfig(
+    square_image=True,
     ny=128,
     nx=128
 )
@@ -115,6 +117,18 @@ class ParticleInfo:
     intensity: Union[np.ndarray, None] = None
 
     def __post_init__(self):
+        if isinstance(self.x, (int, float)):
+            self.x = np.array([self.x])
+
+        if isinstance(self.y, (int, float)):
+            self.y = np.array([self.y])
+
+        if isinstance(self.z, (int, float)):
+            self.z = np.array([self.z])
+
+        if isinstance(self.size, (int, float)):
+            self.size = np.array([self.size, ])
+
         assert len(self.x) == len(self.y)
         assert len(self.x) == len(self.z)
         assert len(self.x) == len(self.size)
@@ -246,13 +260,13 @@ def generate_image(
     image_shape = (config.ny, config.nx)
     image_size = image_shape[0] * image_shape[1]
 
-    sensitivity = config['sensitivity']
-    qe = config['qe']
-    dark_noise = config['dark_noise']
-    baseline = config['noise_baseline']
-    shot_noise_enabled = config['shot_noise']
+    sensitivity = config.sensitivity
+    qe = config.qe
+    dark_noise = config.dark_noise
+    baseline = config.noise_baseline
+    shot_noise_enabled = config.shot_noise
 
-    bit_depth = config['bit_depth']
+    bit_depth = config.bit_depth
 
     if particle_data is not None:
         xp = particle_data.x
@@ -289,10 +303,10 @@ def generate_image(
                     raise ValueError(f'particle information must be 1D and not {_arg.ndim}D: {_arg}')
             n_particles = xp.size
     else:
-        if config['particle_number'] < 1:
+        if config.particle_number < 1:
             raise ValueError('Argument "particle_number" invalid. Must be an integer greater than 0: '
                              f'{config["particle_number"]}')
-        n_particles = int(config['particle_number'])
+        n_particles = int(config.particle_number)
         assert n_particles > 0
         pmean = config.particle_size_mean  # mean particle size
         pstd = config.particle_size_std  # standard deviation of particle size
@@ -307,11 +321,11 @@ def generate_image(
     ppp = n_particles / image_size  # real ppp
 
     q = 2 ** bit_depth
-    dz0 = config['laser_width']
-    s = config['laser_shape_factor']
+    dz0 = config.laser_width
+    s = config.laser_shape_factor
 
     # seed particles:
-    _intensity = np.zeros(image_shape)
+    irrad_photons = np.zeros(image_shape)
     if particle_data is None:
         xy_seeding_method = kwargs.pop('xy_seeding_method', 'random')
         zminmax = _compute_max_z_position_from_laser_properties(dz0, s)
@@ -328,7 +342,10 @@ def generate_image(
         # we should not clip the normal distribution
         # particle_sizes = np.clip(np.random.normal(pmean, pstd, n_particles), pmin, pmax)
         # but rather redo the normal distribution for the outliers:
-        particle_sizes = np.random.normal(pmean, pstd, n_particles)
+        if pstd > 0:
+            particle_sizes = np.random.normal(pmean, pstd, n_particles)
+        else:
+            particle_sizes = np.ones(n_particles)*pmean
         iout = np.argwhere((particle_sizes < pmin) | (particle_sizes > pmax))
         for i in iout[:, 0]:
             dp = np.random.normal(pmean, pstd)
@@ -337,16 +354,25 @@ def generate_image(
             particle_sizes[i] = dp
 
     # illuminate:
-    if config['particle_size_illumination_dependency']:
+    if config.particle_size_illumination_dependency:
         part_intensity = particle_intensity(zp, dz0, s, dp=particle_sizes)
         part_intensity = part_intensity / (np.pi * max(particle_sizes) ** 2 / 8)
     else:
         part_intensity = particle_intensity(zp, dz0, s)
-    part_intensity = part_intensity * q * config.sensor_gain
+
+    # Computation of the particle intensity:
+    # particle intensity = laser intensity x q x sensor gain
+    # laser intensity is maximal 1
+    # q is the bit depth
+
+    # part_intensity [0, 1]
+    # q --> bit depth, e.g. 8 or 16
+
+    part_intensity = part_intensity * 2**bit_depth * config.relative_laser_intensity
     ny, nx = image_shape
     # nsigma = 4
     for x, y, psize, pint in zip(xp, yp, particle_sizes, part_intensity):
-        delta = int(10 * psize)
+        delta = int(10 * psize)  # range plus minus the particle position, which changes the counts. theoretically all pixels must be changed, but it is only significant cose by
         xint = int(x)
         yint = int(y)
         xmin = max(0, xint - delta)
@@ -358,20 +384,42 @@ def generate_image(
         py = y - ymin
         xx, yy = np.meshgrid(range(sub_img_shape[1]), range(sub_img_shape[0]))
         squared_dist = (px - xx) ** 2 + (py - yy) ** 2
-        _intensity[ymin:ymax, xmin:xmax] += np.exp(-8 * squared_dist / psize ** 2) * pint
+        irrad_photons[ymin:ymax, xmin:xmax] += np.exp(-8 * squared_dist / psize ** 2) * pint
 
-    # add noise (pass the number of photons! That's why multiplication with sensitivity)
-    if dark_noise == 0. and not shot_noise_enabled and baseline == 0.:
-        pass  # add NO noise
+    # so far, we computed the "photons" emitted from the particle --> num_photons
+
+    # let's now compute the noise. First we compute the photon shot noise (https://en.wikipedia.org/wiki/Shot_noise):
+    if shot_noise_enabled:
+        shot_noise = noise.shot_noise(irrad_photons)
+        # converting to electrons
+        electrons = qe * shot_noise
     else:
-        _intensity = add_camera_noise(_intensity / sensitivity, qe=qe, sensitivity=sensitivity,
-                                      dark_noise=dark_noise, baseline=baseline, enable_shot_noise=shot_noise_enabled)
+        electrons = qe * irrad_photons
+
+    if dark_noise > 0:
+        electrons_out = electrons + noise.dark_noise(baseline, dark_noise, electrons.shape)
+    else:
+        electrons_out = electrons
 
     max_adu = int(2 ** bit_depth - 1)
-    _saturated_pixels = _intensity > max_adu
-    n_saturated_pixels = np.sum(_saturated_pixels)
+    adu = electrons_out * sensitivity
+    # if baseline > 0:
+    #     adu += baseline
 
-    _intensity[_saturated_pixels] = max_adu  # models pixel saturation
+    # # add noise (pass the number of photons! That's why multiplication with sensitivity)
+    # if dark_noise == 0. and not shot_noise_enabled and baseline == 0.:
+    #     pass  # add NO noise
+    # else:
+    #     _intensity = add_camera_noise(_intensity / sensitivity, qe=qe, sensitivity=sensitivity,
+    #                                   dark_noise=dark_noise, baseline=baseline,
+    #                                   enable_shot_noise=shot_noise_enabled)
+
+    # max_adu = int(2 ** bit_depth - 1)
+    _saturated_pixels = adu > max_adu
+    n_saturated_pixels = np.sum(_saturated_pixels)
+    adu[adu > max_adu] = max_adu  # model saturation
+    #
+    # _intensity[_saturated_pixels] = max_adu  # models pixel saturation
 
     attrs = {'bit_depth': bit_depth,
              'noise_baseline': baseline,
@@ -388,14 +436,18 @@ def generate_image(
              'laser_max_intensity': q,
              'particle_size_mean': config.particle_size_mean,
              'particle_size_std': config.particle_size_std,
-             'sensor_gain': config.sensor_gain,
+             'relative_laser_intensity': config.relative_laser_intensity,
              'code_source': 'https://git.scc.kit.edu/da4323/piv-particle-density',
              'version': __version__}
 
     particle_info = ParticleInfo(**{'x': xp, 'y': yp, 'z': zp,
                                     'size': particle_sizes,
                                     'intensity': part_intensity})
-    return _intensity.astype(int), attrs, particle_info
+    if bit_depth == 8:
+        return adu.astype(np.uint8), attrs, particle_info
+    elif bit_depth == 16:
+        return adu.astype(np.uint16), attrs, particle_info
+    return adu.astype(uint), attrs, particle_info
 
 
 def _compute_max_z_position_from_laser_properties(dz0: float, s: int) -> float:
@@ -425,6 +477,8 @@ def particle_intensity(z: np.ndarray, dz0: float, s: int, dp: np.ndarray = None)
         laser beam width. for 2 profile is gaussian
     s : int
         shape factor
+    dp: array-like
+        image particle diameter
     """
     if s == 0:
         if dp is None:
@@ -784,7 +838,7 @@ class ConfigManager:
                 ds_std_size[:] = [np.std(p.size) for p in particle_information]
                 # ds_intensity_mean[:] = [np.mean(p['intensity']) for p in particle_information]
                 # ds_intensity_std[:] = [np.std(p['intensity']) for p in particle_information]
-                ds_bitdepth[:] = [a['bit_depth'] for a in attrs]
+                ds_bitdepth[:] = [a.bit_depth for a in attrs]
 
                 part_pos_grp = h5.create_group('particle_infos')
                 for ipart, part_info in enumerate(particle_information):
