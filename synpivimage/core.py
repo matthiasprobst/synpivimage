@@ -172,7 +172,7 @@ def process_config_for_particle_position(cfg: SynPivConfig):
 def write_yaml_file(filename: Union[str, bytes, os.PathLike], data: dict):
     """write data to a yaml file"""
     with open(filename, 'w') as f:
-        yaml.dump(data, f)
+        yaml.dump(dict(data), f)
     return filename
 
 

@@ -10,7 +10,9 @@ from .core import (generate_default_yaml_file,
                    ParticleInfo)
 
 __package_dir__ = pathlib.Path(__file__).parent
-generate_default_yaml_file()
+
+
+# generate_default_yaml_file()
 
 
 def displace(particle_infos: Union[List[ParticleInfo], ParticleInfo], dx=None, dy=None, dz=None):
