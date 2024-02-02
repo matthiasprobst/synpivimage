@@ -330,7 +330,8 @@ def generate_image(
     # part_intensity [0, 1]
     # q --> bit depth, e.g. 8 or 16
 
-    relative_laser_intensity = config.image_particle_peak_count / (2 ** config.bit_depth) / config.qe / config.sensitivity
+    relative_laser_intensity = config.image_particle_peak_count / (
+                2 ** config.bit_depth) / config.qe / config.sensitivity
     part_intensity = part_intensity * 2 ** bit_depth * relative_laser_intensity
     ny, nx = image_shape
     # nsigma = 4

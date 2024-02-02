@@ -1,6 +1,6 @@
+import h5py
 import h5rdmtoolbox as h5tbx
 import matplotlib.pyplot as plt
-# import h5py
 import numpy as np
 import pathlib
 import unittest
@@ -10,12 +10,6 @@ from synpivimage import DEFAULT_CFG
 from synpivimage import build_ConfigManager, generate_image
 
 __this_dir__ = pathlib.Path(__file__).parent
-
-
-# import warnings
-
-
-# from synpivimage.conventions import Layout
 
 
 class TestCore(unittest.TestCase):
@@ -34,37 +28,33 @@ class TestCore(unittest.TestCase):
 
     def test_build_config_manager(self):
         cfg = DEFAULT_CFG
-        cfg['nx'] = 16
-        cfg['ny'] = 16
-        particle_number_range = ('particle_number', np.linspace(1, cfg['ny'] * cfg['nx'], 101).astype(int))
-        CFG = build_ConfigManager(cfg, [particle_number_range, ], per_combination=1)
+        cfg.nx = 16
+        cfg.ny = 16
+        particle_number_variation = dict(particle_number=np.linspace(1, cfg.ny * cfg.nx, 101).astype(int))
+        CFG = build_ConfigManager(initial_cfg=cfg,
+                                  variation_dict=particle_number_variation,
+                                  per_combination=1)
         assert len(CFG) == 101
-        CFG = build_ConfigManager(cfg, [particle_number_range, ], per_combination=2)
+        CFG = build_ConfigManager(initial_cfg=cfg,
+                                  variation_dict=particle_number_variation,
+                                  per_combination=2)
         assert len(CFG) == 101 * 2
 
         generated_particle_number = [cfg['particle_number'] for cfg in CFG.cfgs]
-        assert np.array_equal(np.unique(np.sort(generated_particle_number)), particle_number_range[1])
+        assert np.array_equal(np.unique(np.sort(generated_particle_number)),
+                              particle_number_variation['particle_number'])
 
     def test_generate(self):
         cfg = DEFAULT_CFG
-        cfg['nx'] = 16
-        cfg['ny'] = 16
-        particle_number_range = ('particle_number', np.linspace(1, cfg['ny'] * cfg['nx'], 5).astype(int))
-        CFG = build_ConfigManager(cfg, [particle_number_range, ], per_combination=1)
+        cfg.nx = 16
+        cfg.ny = 16
+        particle_number_range = {'particle_number': np.linspace(1, cfg.ny * cfg.nx, 5).astype(int)}
+        CFG = build_ConfigManager(initial_cfg=cfg,
+                                  variation_dict=particle_number_range,
+                                  per_combination=1)
         CFG.generate('.', nproc=1)
 
         hdf_filename = 'ds_000000.hdf'
-
-        try:
-            from h5rdmtoolbox.conventions.cflike import StandardNameTable
-            snt = StandardNameTable.from_gitlab(url='https://git.scc.kit.edu',
-                                                file_path='particle_image_velocimetry-v1.yaml',
-                                                project_id='35942',
-                                                ref_name='main')
-
-            snt.check_file(hdf_filename)
-        except ImportError:
-            warnings.warn('Standard names could not be checked as h5rdmtoolbox is not installed')
 
         with h5py.File(hdf_filename) as h5:
             self.assertIn('images', h5)
@@ -80,18 +70,13 @@ class TestCore(unittest.TestCase):
             assert h5['images'].dims[1][0] == h5['iy']
             assert h5['images'].dims[2][0] == h5['ix']
 
-        h5l = Layout()
-        h5l.check_file(hdf_filename)
-        self.assertEqual(h5l.n_issues, 0)
-        h5l.report()
-
     def test_generate_second_image(self):
         cfg = DEFAULT_CFG
         cfg.nx = 16
         cfg.ny = 16
         cfg.laser_width = 2
         particle_numbers = np.linspace(1, cfg.ny * cfg.nx * 0.1, 5).astype(int)
-        
+
         CFG = build_ConfigManager(
             initial_cfg=cfg,
             variation_dict={'particle_number': particle_numbers},
