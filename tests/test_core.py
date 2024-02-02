@@ -26,6 +26,15 @@ class TestCore(unittest.TestCase):
         for hdf_filename in hdf_filenames:
             hdf_filename.unlink(missing_ok=True)
 
+    def test_write_read_config(self):
+        from synpivimage.core import generate_default_yaml_file, read_config, SynPivConfig
+        filename = generate_default_yaml_file()
+
+        cfg = read_config(filename)
+        self.assertIsInstance(cfg, SynPivConfig)
+
+        filename.unlink(missing_ok=True)
+
     def test_build_config_manager(self):
         cfg = DEFAULT_CFG
         cfg.nx = 16

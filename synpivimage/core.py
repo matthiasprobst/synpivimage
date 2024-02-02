@@ -176,9 +176,10 @@ def write_yaml_file(filename: Union[str, bytes, os.PathLike], data: dict):
     return filename
 
 
-def generate_default_yaml_file() -> None:
+def generate_default_yaml_file() -> pathlib.Path:
     """Writes the default configuration to the default yaml file"""
     write_yaml_file(default_yaml_file, DEFAULT_CFG)
+    return pathlib.Path(default_yaml_file)
 
 
 def yaml2dict(yaml_file: Union[str, bytes, os.PathLike]) -> Dict:
@@ -190,7 +191,8 @@ def yaml2dict(yaml_file: Union[str, bytes, os.PathLike]) -> Dict:
 
 def read_config(filename: Union[str, bytes, os.PathLike]) -> Dict:
     """Reads the yaml configuration from file and returns it as a dictionary"""
-    return yaml2dict(filename)
+    from .config import SynPivConfig
+    return SynPivConfig(**yaml2dict(filename))
 
 
 def generate_image(
@@ -331,7 +333,7 @@ def generate_image(
     # q --> bit depth, e.g. 8 or 16
 
     relative_laser_intensity = config.image_particle_peak_count / (
-                2 ** config.bit_depth) / config.qe / config.sensitivity
+            2 ** config.bit_depth) / config.qe / config.sensitivity
     part_intensity = part_intensity * 2 ** bit_depth * relative_laser_intensity
     ny, nx = image_shape
     # nsigma = 4
