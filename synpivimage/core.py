@@ -838,7 +838,7 @@ class ConfigManager:
                 ds_std_size[:] = [np.std(p.size) for p in particle_information]
                 # ds_intensity_mean[:] = [np.mean(p['intensity']) for p in particle_information]
                 # ds_intensity_std[:] = [np.std(p['intensity']) for p in particle_information]
-                ds_bitdepth[:] = [a.bit_depth for a in attrs]
+                ds_bitdepth[:] = [a['bit_depth'] for a in attrs]
 
                 part_pos_grp = h5.create_group('particle_infos')
                 for ipart, part_info in enumerate(particle_information):
