@@ -1,24 +1,23 @@
 """Core module"""
+import h5py
+import itertools
 import multiprocessing as mp
+import numpy as np
 import os
 import pathlib
 import random
 import warnings
-from dataclasses import dataclass
-
-import h5py
-import itertools
-import numpy as np
 import xarray as xr
 import yaml
+from dataclasses import dataclass
 from math import ceil
-from pydantic import BaseModel
 from scipy.ndimage import gaussian_filter
 from tqdm import tqdm
 from typing import Dict, List, Union, Tuple
 
 from . import noise
 from ._version import __version__
+from .config import SynPivConfig, DEFAULT_CFG
 
 # from .noise import add_camera_noise
 
@@ -44,43 +43,6 @@ PMIN_ALLOWED: float = 0.1
 
 
 # default config has no noise since it can be added afterwards, too
-
-class SynPivConfig(BaseModel):
-    ny: int
-    nx: int
-    square_image: bool
-    bit_depth: int = 16
-    noise_baseline: float = 0.0
-    dark_noise: float = 0.0  # noise_baseline: 20, dark_noise: 2.29,
-    shot_noise: bool = False
-    sensitivity: float = 1.
-    qe: float = 0.25  # quantum efficiency. efficiency of photons to electron conversion
-    particle_number: int = 1
-    particle_size_mean: float = 2.5
-    particle_size_std: float = 0.25
-    laser_width: int = 3
-    laser_shape_factor: int = 2
-    relative_laser_intensity: int = 1.0  # relative laser intensity to max bit depth
-    # laser_max_intensity: 1000
-    particle_position_file: Union[str, pathlib.Path, None] = None
-    particle_size_illumination_dependency: bool = True
-
-    def __getitem__(self, item):
-        warnings.warn(f'Please use .{item}', DeprecationWarning)
-        if hasattr(self, item):
-            return getattr(self, item)
-        raise KeyError(f'invalid key: {item}')
-
-    def __setitem__(self, key, value):
-        warnings.warn(f'Please item assignment: {key}={value}', DeprecationWarning)
-        setattr(self, key, value)
-
-
-DEFAULT_CFG = SynPivConfig(
-    square_image=True,
-    ny=128,
-    nx=128
-)
 
 
 # DEFAULT_CFG = ConfigParser()
@@ -345,7 +307,7 @@ def generate_image(
         if pstd > 0:
             particle_sizes = np.random.normal(pmean, pstd, n_particles)
         else:
-            particle_sizes = np.ones(n_particles)*pmean
+            particle_sizes = np.ones(n_particles) * pmean
         iout = np.argwhere((particle_sizes < pmin) | (particle_sizes > pmax))
         for i in iout[:, 0]:
             dp = np.random.normal(pmean, pstd)
@@ -368,11 +330,13 @@ def generate_image(
     # part_intensity [0, 1]
     # q --> bit depth, e.g. 8 or 16
 
-    part_intensity = part_intensity * 2**bit_depth * config.relative_laser_intensity
+    relative_laser_intensity = config.image_particle_peak_count / (2 ** config.bit_depth) / config.qe / config.sensitivity
+    part_intensity = part_intensity * 2 ** bit_depth * relative_laser_intensity
     ny, nx = image_shape
     # nsigma = 4
     for x, y, psize, pint in zip(xp, yp, particle_sizes, part_intensity):
-        delta = int(10 * psize)  # range plus minus the particle position, which changes the counts. theoretically all pixels must be changed, but it is only significant cose by
+        delta = int(
+            10 * psize)  # range plus minus the particle position, which changes the counts. theoretically all pixels must be changed, but it is only significant cose by
         xint = int(x)
         yint = int(y)
         xmin = max(0, xint - delta)
@@ -436,7 +400,7 @@ def generate_image(
              'laser_max_intensity': q,
              'particle_size_mean': config.particle_size_mean,
              'particle_size_std': config.particle_size_std,
-             'relative_laser_intensity': config.relative_laser_intensity,
+             'image_particle_peak_count': config.image_particle_peak_count,
              'code_source': 'https://git.scc.kit.edu/da4323/piv-particle-density',
              'version': __version__}
 
@@ -447,7 +411,7 @@ def generate_image(
         return adu.astype(np.uint8), attrs, particle_info
     elif bit_depth == 16:
         return adu.astype(np.uint16), attrs, particle_info
-    return adu.astype(uint), attrs, particle_info
+    return adu.astype(int), attrs, particle_info
 
 
 def _compute_max_z_position_from_laser_properties(dz0: float, s: int) -> float:

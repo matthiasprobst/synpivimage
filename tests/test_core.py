@@ -1,10 +1,9 @@
-import pathlib
-import unittest
-
 import h5rdmtoolbox as h5tbx
 import matplotlib.pyplot as plt
 # import h5py
 import numpy as np
+import pathlib
+import unittest
 
 import synpivimage.core
 from synpivimage import DEFAULT_CFG
@@ -133,18 +132,19 @@ class TestCore(unittest.TestCase):
         cfg.nx = 16
         cfg.ny = 16
         cfg.laser_width = 2
-        cfg.particle_number = 5
+        cfg.particle_number = 1
         cfg.qe = 1
         cfg.dark_noise = 0
         cfg.noise_baseline = 0
+        cfg.shot_noise = False
         cfg.sensitivity = 1
-        cfg.relative_laser_intensity = 1  # 1000/(2**cfg.bit_depth)
+        cfg.image_particle_peak_count = 1000
 
         imgA, attrsA, part_infoA = generate_image(
             cfg,
             particle_data=synpivimage.ParticleInfo(x=8, y=8, z=0, size=2.5)
         )
-        self.assertEqual(imgA.max(), 2 ** cfg.bit_depth-1)
+        self.assertEqual(imgA.max(), cfg.image_particle_peak_count)
 
         cfg.qe = 0.25
 
@@ -152,27 +152,28 @@ class TestCore(unittest.TestCase):
             cfg,
             particle_data=synpivimage.ParticleInfo(x=8, y=8, z=0, size=2.5)
         )
-        self.assertEqual(imgA.max(), int((2 ** cfg.bit_depth)*cfg.qe))
+        self.assertEqual(imgA.max(), cfg.image_particle_peak_count)
 
         cfg.qe = 1
-        cfg.sensitivity = 1/4
+        cfg.sensitivity = 1 / 4
 
         imgA, attrsA, part_infoA = generate_image(
             cfg,
             particle_data=synpivimage.ParticleInfo(x=8, y=8, z=0, size=2.5)
         )
-        self.assertEqual(imgA.max(), int((2 ** cfg.bit_depth)*cfg.sensitivity))
+        self.assertEqual(imgA.max(), cfg.image_particle_peak_count)
 
         # max count = 1000
         cfg.qe = 1
         cfg.sensitivity = 1
-        cfg.relative_laser_intensity = 1000/(2**cfg.bit_depth)
+        cfg.image_particle_peak_count = 1000
 
         imgA, attrsA, part_infoA = generate_image(
             cfg,
             particle_data=synpivimage.ParticleInfo(x=8, y=8, z=0, size=2.5)
         )
-        self.assertEqual(imgA.max(), 1000)
+        self.assertEqual(imgA.max(), cfg.image_particle_peak_count)
+        self.assertEqual(imgA[8, 8], cfg.image_particle_peak_count)
 
         fig, axs = plt.subplots(1, 1)
         imgAmax = imgA.max()
