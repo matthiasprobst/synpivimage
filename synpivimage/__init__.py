@@ -4,7 +4,7 @@ from typing import Union, List
 from ._version import __version__
 from .core import (generate_default_yaml_file,
                    generate_image,
-                   DEFAULT_CFG,
+                   get_default,
                    build_ConfigManager,
                    ConfigManager,
                    ParticleInfo)
@@ -29,5 +29,5 @@ def displace_from_hdf(hdf_filename, dx=None, dy=None, dz=None):
 
 
 __all__ = ['__version__', 'build_ConfigManager', 'ConfigManager',
-           'DEFAULT_CFG', 'generate_image', 'generate_default_yaml_file',
+           'get_default', 'generate_image', 'generate_default_yaml_file',
            '__package_dir__']

@@ -1,6 +1,6 @@
 import numpy as np
 
-SEED = 100
+SEED = None
 
 np.random.seed(seed=SEED)
 

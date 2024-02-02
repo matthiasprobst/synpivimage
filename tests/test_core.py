@@ -4,10 +4,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pathlib
 import unittest
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 import synpivimage.core
-from synpivimage import DEFAULT_CFG
 from synpivimage import build_ConfigManager, generate_image
+from synpivimage import get_default
 
 __this_dir__ = pathlib.Path(__file__).parent
 
@@ -36,7 +37,7 @@ class TestCore(unittest.TestCase):
         filename.unlink(missing_ok=True)
 
     def test_build_config_manager(self):
-        cfg = DEFAULT_CFG
+        cfg = get_default()
         cfg.nx = 16
         cfg.ny = 16
         particle_number_variation = dict(particle_number=np.linspace(1, cfg.ny * cfg.nx, 101).astype(int))
@@ -54,7 +55,7 @@ class TestCore(unittest.TestCase):
                               particle_number_variation['particle_number'])
 
     def test_generate(self):
-        cfg = DEFAULT_CFG
+        cfg = get_default()
         cfg.nx = 16
         cfg.ny = 16
         particle_number_range = {'particle_number': np.linspace(1, cfg.ny * cfg.nx, 5).astype(int)}
@@ -80,7 +81,7 @@ class TestCore(unittest.TestCase):
             assert h5['images'].dims[2][0] == h5['ix']
 
     def test_generate_second_image(self):
-        cfg = DEFAULT_CFG
+        cfg = get_default()
         cfg.nx = 16
         cfg.ny = 16
         cfg.laser_width = 2
@@ -107,7 +108,7 @@ class TestCore(unittest.TestCase):
             )
         )
         part_info = synpivimage.core.ParticleInfo.from_hdf(hdf_filenamesA[0])
-        [p.displace(dy=2) for p in part_info]
+        [p.displace(cfg, dy=2) for p in part_info]
         hdf_filenamesB = CFG.generate(
             data_directory='.',
             suffix='B.hdf',
@@ -122,7 +123,7 @@ class TestCore(unittest.TestCase):
         plt.show()
 
     def test_create_single_image(self):
-        cfg = DEFAULT_CFG
+        cfg = get_default()
         cfg.nx = 16
         cfg.ny = 16
         cfg.laser_width = 2
@@ -175,28 +176,71 @@ class TestCore(unittest.TestCase):
         plt.colorbar(im)
         plt.show()
 
-    # def test_create_single_image(self):
-    #     cfg = DEFAULT_CFG
-    #     cfg.nx = 16
-    #     cfg.ny = 16
-    #     cfg.laser_width = 2
-    #     cfg.particle_number = 5
-    #     cfg.qe = 0.25
-    #     cfg.dark_noise = 0
-    #     cfg.noise_baseline = 100
-    #     cfg.relative_laser_intensity = 1000/(2**cfg.bit_depth)
-    #     imgA, attrsA, part_infoA = generate_image(
-    #         cfg,
-    #         particle_data=None
-    #     )
-    #     part_infoA.displace(dx=2, dy=1, dz=-1)
-    #     imgB, attrsB, part_infoB = generate_image(
-    #         cfg,
-    #         particle_data=part_infoA
-    #     )
-    #     fig, axs = plt.subplots(1, 2)
-    #     imgAmax = imgA.max()
-    #     axs[0].imshow(imgA, cmap='gray', vmin=0, vmax=imgAmax)
-    #     im = axs[1].imshow(imgB, cmap='gray', vmin=0, vmax=imgAmax)
-    #     plt.colorbar(im)
-    #     plt.show()
+    def test_out_of_plane(self):
+        cfg = get_default()
+        cfg.nx = 100
+        cfg.ny = 100
+        cfg.particle_number = 0.1*cfg.nx*cfg.ny
+        imgA, attrsA, part_infoA = generate_image(
+            cfg
+        )
+        cfg.laser_shape_factor = 10**3
+        cfg.laser_width = 1
+        print(cfg.particle_number)
+
+        imgB, attrsB, part_infoB = generate_image(
+            cfg,
+            particle_data=part_infoA.displace(cfg, dx=2, dy=1, dz=1)
+        )
+        print(attrsB)
+
+        def plot_img(img, ax):
+            im = ax.imshow(img, cmap='gray')
+            divider = make_axes_locatable(ax)
+            cax = divider.append_axes("right", size="5%", pad=0.05)
+            cb = plt.colorbar(im, cax=cax)
+
+        fig, axs = plt.subplots(1, 2)
+        plot_img(imgA, axs[0])
+        plot_img(imgB, axs[1])
+        plt.show()
+
+    def test_displace_particles(self):
+        cfg = get_default()
+        cfg.nx = 16
+        cfg.ny = 16
+        cfg.laser_width = 1
+        cfg.particle_number = 5
+        cfg.qe = 0.25
+        cfg.dark_noise = 0
+        cfg.noise_baseline = 100
+        cfg.image_particle_peak_count = 1000
+        imgA, attrsA, part_infoA = generate_image(
+            cfg,
+            particle_data=synpivimage.ParticleInfo(
+                x=8,
+                y=8,
+                z=0,
+                size=2.5
+            )
+        )
+        part_infoA.displace(cfg, dx=2, dy=1, dz=-1)  #
+        imgB, attrsB, part_infoB = generate_image(
+            cfg,
+            particle_data= part_infoA.displace(cfg, dx=2, dy=1, dz=-1)
+        )
+        fig, axs = plt.subplots(1, 2, sharex=True, sharey=True)
+        imgAmax = imgA.max()
+        im = axs[0].imshow(imgA, cmap='gray', vmin=0, vmax=imgAmax)
+
+        divider = make_axes_locatable(axs[0])
+        cax = divider.append_axes("right", size="5%", pad=0.05)
+        cb = plt.colorbar(im, cax=cax)
+
+        im = axs[1].imshow(imgB, cmap='gray', vmin=0, vmax=imgAmax)
+
+        divider = make_axes_locatable(axs[1])
+        cax = divider.append_axes("right", size="5%", pad=0.05)
+        cb = plt.colorbar(im, cax=cax)
+
+        plt.show()

@@ -36,20 +36,21 @@ class SynPivConfig(BaseModel):
         setattr(self, key, value)
 
 
-DEFAULT_CFG = SynPivConfig(
-    square_image=True,
-    ny=128,
-    nx=128,
-    bit_depth=16,
-    noise_baseline=100,
-    dark_noise=4,
-    shot_noise=True,
-    sensitivity=0.5,
-    qe=0.25,
-    particle_number=1,
-    particle_size_mean=2.5,
-    particle_size_std=0,
-    laser_width=2.,
-    laser_shape_factor=2,
-    relative_laser_intensity=1.0
-)
+def get_default():
+    return SynPivConfig(
+        square_image=True,
+        ny=128,
+        nx=128,
+        bit_depth=16,
+        noise_baseline=100,
+        dark_noise=4,
+        shot_noise=True,
+        sensitivity=0.5,
+        qe=0.25,
+        particle_number=1,
+        particle_size_mean=2.5,
+        particle_size_std=0,
+        laser_width=2.,
+        laser_shape_factor=2,
+        relative_laser_intensity=1.0
+    )
