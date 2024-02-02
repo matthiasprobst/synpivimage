@@ -91,7 +91,7 @@ class TestCore(unittest.TestCase):
         cfg.ny = 16
         cfg.laser_width = 2
         particle_numbers = np.linspace(1, cfg.ny * cfg.nx * 0.1, 5).astype(int)
-        print(particle_numbers)
+        
         CFG = build_ConfigManager(
             initial_cfg=cfg,
             variation_dict={'particle_number': particle_numbers},
