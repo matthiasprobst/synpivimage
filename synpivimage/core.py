@@ -106,6 +106,8 @@ class ParticleInfo:
 
         laser_zmin = -cfg.laser_width / 2
         laser_zmax = cfg.laser_width / 2
+        print(f'Laser zmin: {laser_zmin}, zmax: {laser_zmax}')
+        print(f'Current zmin: {min(self.z)}, zmax: {max(self.z)}')
         particle_number = len(self.x)
         particle_depth_density = particle_number / (laser_zmax - laser_zmin)  # particles per laser depth
 
@@ -171,7 +173,7 @@ class ParticleInfo:
         x_new = x_old + dx
         y_new = y_old + dy
         z_new = z_old + dz
-
+        print('dz', dz, 'znew_min', np.min(z_new), 'znew_max', np.max(z_new))
         # what is leaving in z direction?
         leaving_z = (z_new < laser_zmin) | (z_new >= laser_zmax)
         nz_loss = np.sum(leaving_z)
@@ -202,6 +204,8 @@ class ParticleInfo:
                 box_xp, box_yp, box_zp = _create_new_particles_around_fov(100)
                 nmax = len(box_xp)
                 i = 0
+            if len(box_xp) == 0:
+                break
             new_part_x = box_xp[i] + dx
             new_part_y = box_yp[i] + dy
             new_part_z = box_zp[i] + dz
@@ -553,7 +557,7 @@ def generate_image(
         else:
             xp = np.random.random(n_particles) * image_shape[1]
             yp = np.random.random(n_particles) * image_shape[0]
-        zp = np.random.random(n_particles) * zminmax - zminmax / 2  # physical location in laser sheet! TODO: units??!!
+        zp = np.random.random(n_particles) * zminmax*2 - zminmax  # physical location in laser sheet! TODO: units??!!
         # we should not clip the normal distribution
         # particle_sizes = np.clip(np.random.normal(pmean, pstd, n_particles), pmin, pmax)
         # but rather redo the normal distribution for the outliers:

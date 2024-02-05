@@ -180,17 +180,17 @@ class TestCore(unittest.TestCase):
         cfg = get_default()
         cfg.nx = 100
         cfg.ny = 100
+        cfg.laser_width = 1
         cfg.particle_number = 0.1*cfg.nx*cfg.ny
         imgA, attrsA, part_infoA = generate_image(
             cfg
         )
         cfg.laser_shape_factor = 10**3
-        cfg.laser_width = 1
         print(cfg.particle_number)
 
         imgB, attrsB, part_infoB = generate_image(
             cfg,
-            particle_data=part_infoA.displace(cfg, dx=2, dy=1, dz=1)
+            particle_data=part_infoA.displace(cfg, dx=2, dy=1, dz=0.1)
         )
         print(attrsB)
 

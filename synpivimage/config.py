@@ -35,6 +35,11 @@ class SynPivConfig(BaseModel):
         warnings.warn(f'Please item assignment: {key}={value}', DeprecationWarning)
         setattr(self, key, value)
 
+    def particle_density(self) -> float:
+        """Return particle image density (projection of all particles in laser onto image plane).
+        This value is also referred to as ppp (particle per pixel)"""
+        return self.particle_number / (self.nx * self.ny)
+
 
 def get_default():
     return SynPivConfig(
