@@ -109,7 +109,7 @@ class TestCore(unittest.TestCase):
             )
         )
         part_info = synpivimage.core.ParticleInfo.from_hdf(hdf_filenamesA[0])
-        [p.displace(cfg, dy=2) for p in part_info]
+        [p.displace(dy=2, dx=0, dz=0) for p in part_info]
         hdf_filenamesB = CFG.generate(
             data_directory='.',
             suffix='B.hdf',
@@ -191,7 +191,7 @@ class TestCore(unittest.TestCase):
 
         imgB, attrsB, part_infoB = generate_image(
             cfg,
-            particle_data=part_infoA.displace(cfg, dx=2, dy=1, dz=0.1)
+            particle_data=part_infoA.displace(dx=2, dy=1, dz=0.1)
         )
         print(attrsB)
 
@@ -225,10 +225,10 @@ class TestCore(unittest.TestCase):
                 size=2.5
             )
         )
-        part_infoA.displace(cfg, dx=2, dy=1, dz=-1)  #
+        new_part = part_infoA.displace(dx=2, dy=1, dz=-1)
         imgB, attrsB, part_infoB = generate_image(
             cfg,
-            particle_data=part_infoA.displace(cfg, dx=2, dy=1, dz=-1)
+            particle_data=new_part
         )
 
         np.testing.assert_equal(part_infoB.x, part_infoA.x + 2)

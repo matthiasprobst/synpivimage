@@ -1,8 +1,6 @@
 """Core module"""
-import copy
 import h5py
 import itertools
-import matplotlib.pyplot as plt
 import multiprocessing as mp
 import numpy as np
 import os
@@ -20,6 +18,7 @@ from typing import Dict, List, Union, Tuple
 from . import noise
 from ._version import __version__
 from .config import SynPivConfig, get_default
+from .utils import generate_particle_size_distribution
 
 # from .noise import add_camera_noise
 
@@ -40,8 +39,6 @@ if h5tbx_is_available:
 CPU_COUNT = mp.cpu_count()
 
 default_yaml_file: str = 'default.yaml'
-
-PMIN_ALLOWED: float = 0.1
 
 DEBUG_PLOT = False
 
@@ -103,319 +100,16 @@ class ParticleInfo:
         return part_infos
 
     def displace(self,
-                 cfg: SynPivConfig,
-                 dx: Union[float, int, np.ndarray, None] = None,
-                 dy: Union[float, int, np.ndarray, None] = None,
-                 dz: Union[float, int, np.ndarray, None] = None) -> "ParticleInfo":
+                 dx: Union[float, int, np.ndarray],
+                 dy: Union[float, int, np.ndarray],
+                 dz: Union[float, int, np.ndarray]) -> "ParticleInfo":
         """Displace the particles in x, y and z direction and return a new ParticleInfo object"""
-        zero_displacement = np.zeros_like(self.x)
-        if dz is None:
-            dz = zero_displacement
-        elif isinstance(dz, (int, float)):
-            dz = np.ones_like(self.x) * dz
-        if isinstance(dy, (int, float)):
-            dy = np.ones_like(self.x) * dy
-        elif dy is None:
-            dy = zero_displacement
-        if isinstance(dx, (int, float)):
-            dx = np.ones_like(self.x) * dx
-        elif dx is None:
-            dx = zero_displacement
-
-        assert len(dx) == len(dy) == len(dz) == len(self.x)
-
-        laser_zmin = -cfg.laser_width / 2
-        laser_zmax = cfg.laser_width / 2
-        print(f'Laser zmin: {laser_zmin}, zmax: {laser_zmax}')
-        print(f'Current zmin: {min(self.z)}, zmax: {max(self.z)}')
-        particle_number = len(self.x)
-        particle_depth_density = particle_number / (laser_zmax - laser_zmin)  # particles per laser depth
-
-        # compute the source location of the particles
-        dx_max = np.max(dx)
-        dy_max = np.max(dy)
-        dz_max = np.max(dz)
-
-        source_x = self.x - np.ceil(dx_max)
-        source_y = self.y - np.ceil(dy_max)
-        source_z = self.z - np.ceil(dz_max)
-
-        def _create_new_particles_around_fov(n_particles_box: int = None):
-            # fac = 0
-            box_x_min = min(min(source_x), min(self.x))  # - fac * np.abs(dx)
-            box_x_max = max(max(source_x), max(self.x))  # + fac * np.abs(dx)
-            box_y_min = min(min(source_y), min(self.y))  # - fac * np.abs(dy)
-            box_y_max = max(max(source_y), max(self.y))  # + fac * np.abs(dy)
-            box_z_min = min(min(source_z), min(self.z))  # - fac * np.abs(dz)
-            box_z_max = max(max(source_z), max(self.z))  # + fac * np.abs(dz)
-
-            # print('Bounding box: ', box_x_min, box_x_max, box_y_min, box_y_max, box_z_min, box_z_max)
-
-            # create random particles in the box
-            dz_box = box_z_max - box_z_min
-            if n_particles_box is None:
-                n_particles_box = particle_depth_density * dz_box
-            box_zp = np.random.uniform(box_z_min, box_z_max, int(n_particles_box))
-            box_xp = np.random.uniform(box_x_min, box_x_max, int(n_particles_box))
-            box_yp = np.random.uniform(box_y_min, box_y_max, int(n_particles_box))
-
-            # remove the particles which are inside the laser area
-            laser_area = (box_zp > laser_zmin) & (box_zp < laser_zmax) & (box_xp > 0) & (box_xp < cfg.nx) & (
-                    box_yp >= 0) & (
-                                 box_yp < cfg.ny)
-
-            if DEBUG_PLOT:
-                fig = plt.figure()
-                ax = fig.add_subplot(projection='3d')
-                ax.scatter(box_xp, box_yp, box_zp, c='r', marker='o')
-                plt.show()
-
-            box_xp = box_xp[~laser_area]
-            box_yp = box_yp[~laser_area]
-            box_zp = box_zp[~laser_area]
-            return box_xp, box_yp, box_zp
-
-        box_xp, box_yp, box_zp = _create_new_particles_around_fov(None)
-
-        # print(f'Generate {len(box_xp)} particles outside the laser sheet.')
-
-        if DEBUG_PLOT:
-            fig = plt.figure()
-            ax = fig.add_subplot(projection='3d')
-            ax.scatter(box_xp, box_yp, box_zp, c='r', marker='o')
-            ax.set_xlabel('X Label')
-            ax.set_ylabel('Y Label')
-            ax.set_zlabel('Z Label')
-            plt.show()
-
-        # move the particles to the new location
-        x_old = self.x
-        y_old = self.y
-        z_old = self.z
-
-        # move old particles:
-        x_new = x_old + dx
-        y_new = y_old + dy
-        z_new = z_old + dz
-        print('dz', dz, 'znew_min', np.min(z_new), 'znew_max', np.max(z_new))
-        # what is leaving in z direction?
-        leaving_z = (z_new < laser_zmin) | (z_new >= laser_zmax)
-        nz_loss = np.sum(leaving_z)
-        print(f'Lost particles: {nz_loss} ({nz_loss / len(z_new) * 100} %)')
-
-        # keep those inside the laser sheet
-        laser_area = (z_new > laser_zmin) & (z_new < laser_zmax) & (x_new >= 0) & (x_new < cfg.nx) & (y_new >= 0) & (
-                y_new < cfg.ny)
-        x = x_new[laser_area]
-        y = y_new[laser_area]
-        z = z_new[laser_area]
-        size = self.size[laser_area]
-
-        # move new particles if they fall inside the new laser sheet until ppp is reached
-        current_ppp = len(x) / (cfg.nx * cfg.ny)
-        target_ppp = cfg.particle_number / cfg.nx / cfg.ny
-        i = 0
-
-        def generate_size(cfg):
-            # TODO: Fix this
-            return cfg.particle_size_mean
-
-        nmax = len(box_xp)
-        while current_ppp < target_ppp:
-            # move a particle
-            if i == nmax:
-                # generate new particles
-                box_xp, box_yp, box_zp = _create_new_particles_around_fov(100)
-                nmax = len(box_xp)
-                i = 0
-            if len(box_xp) == 0:
-                break
-
-            new_part_x = box_xp[i] + box_dx[i]
-            new_part_y = box_yp[i] + box_dy[i]
-            new_part_z = box_zp[i] + box_dz[i]
-            # now, append the particle if it is inside the laser sheet
-
-            if new_part_z > laser_zmin and new_part_z < laser_zmax and new_part_x > 0 and new_part_x < cfg.nx and new_part_y >= 0 and new_part_y < cfg.ny:
-                x = np.append(x, new_part_x)
-                y = np.append(y, new_part_y)
-                z = np.append(z, new_part_z)
-                size = np.append(size, generate_size(cfg))
-                current_ppp = len(x) / (cfg.nx * cfg.ny)
-                # print(f'adding particle {i}/{len(box_xp)} at {new_part_x}, {new_part_y}, {new_part_z}. '
-                #       f'current ppp: {current_ppp}')
-            i += 1
-
-        if DEBUG_PLOT:
-            fig = plt.figure()
-            ax = fig.add_subplot(projection='3d')
-            ax.scatter(x, y, z, c='r', marker='o')
-            ax.set_xlabel('X Label')
-            ax.set_ylabel('Y Label')
-            ax.set_zlabel('Z Label')
-            plt.show()
-
-        print(f"Number of particles inside the laser sheet: {len(x)}")
-        print(f"ppp: {len(x) / (cfg.nx * cfg.ny)}")
-
-        return ParticleInfo(x, y, z, size)
-
-    def displace2(self, cfg, dx=None, dy=None, dz=None):
-        """Displace the particles"""
-        if dz is not None:
-            new_z = self.z + dz
-            old_zmin = np.min(self.z)
-            old_zmax = np.max(self.z)
-            new_zmin = np.min(new_z)
-            new_zmax = np.max(new_z)
-
-            particle_number = len(self.x)
-            current_ppp = particle_number / cfg.nx / cfg.ny
-
-            min_z_displacement = np.min(dz)
-            max_z_displacement = np.max(dz)
-
-            laser_zmin = -cfg.laser_width / 2
-            laser_zmax = cfg.laser_width / 2
-
-            particle_z_density = particle_number / (laser_zmax - laser_zmin)
-
-            pmin = cfg.particle_size_mean - 3 * cfg.particle_size_std  # min particle size is 3*sigma below mean psize
-            if pmin < PMIN_ALLOWED:
-                warnings.warn(f'Particles smaller then {PMIN_ALLOWED} are set to {PMIN_ALLOWED}.')
-                pmin = PMIN_ALLOWED
-                if cfg.particle_size_mean <= pmin:
-                    raise ValueError('Mean particle size must be larger than smallest particle size!')
-            pmax = cfg.particle_size_mean + 3 * cfg.particle_size_std  # max particle size is 3*sigma above mean psize
-
-            if max(min_z_displacement,
-                   max_z_displacement) > 0:  # particles are moving in negative z direction --> create a new box
-                # compute new equally distribute particle locations
-                box1_width = np.abs(min(min_z_displacement, max_z_displacement))
-                box_particle_number = int(particle_z_density * box1_width)
-
-                box1_zp = np.random.random(box_particle_number) * box1_width - box1_width + laser_zmin
-                box1_xp = np.random.random(box_particle_number) * cfg.nx
-                box1_yp = np.random.random(box_particle_number) * cfg.ny
-
-                if cfg.particle_size_std > 0:
-                    box1_size = np.random.normal(cfg.particle_size_mean, cfg.particle_size_std, box_particle_number)
-                    iout = np.argwhere((box1_size < pmin) | (box1_size > pmax))
-                    for i in iout[:, 0]:
-                        dp = np.random.normal(cfg.particle_size_mean, cfg.particle_size_std)
-                        while dp < pmin or dp > pmax:
-                            dp = np.random.normal(cfg.particle_size_mean, cfg.particle_size_std)
-                        box1_size[i] = dp
-                else:
-                    box1_size = np.ones(box_particle_number) * cfg.particle_size_mean
-
-                assert np.min(box1_zp) > laser_zmin - box1_width
-                assert np.max(box1_zp) < laser_zmin
-                print('ppp box1 = ', box_particle_number / cfg.nx / cfg.ny)
-            else:
-                box1_zp = np.array([])
-                box1_xp = np.array([])
-                box1_yp = np.array([])
-                box1_size = np.array([])
-
-            if min(min_z_displacement,
-                   max_z_displacement) < 0:  # particles are moving in positive z direction --> create a new box
-                # compute new equally distribute particle locations
-                box2_width = np.abs(max(min_z_displacement, max_z_displacement))
-                box_particle_number = int(particle_z_density * box2_width)
-
-                box2_zp = np.random.random(box_particle_number) * box2_width + laser_zmax
-                box2_xp = np.random.random(box_particle_number) * cfg.nx
-                box2_yp = np.random.random(box_particle_number) * cfg.ny
-                if cfg.particle_size_std > 0:
-                    box2_size = np.random.normal(cfg.particle_size_mean, cfg.particle_size_std, box_particle_number)
-                    iout = np.argwhere((box2_size < pmin) | (box2_size > pmax))
-                    for i in iout[:, 0]:
-                        dp = np.random.normal(cfg.particle_size_mean, cfg.particle_size_std)
-                        while dp < pmin or dp > pmax:
-                            dp = np.random.normal(cfg.particle_size_mean, cfg.particle_size_std)
-                        box2_size[i] = dp
-                else:
-                    box2_size = np.ones(box_particle_number) * cfg.particle_size_mean
-                assert np.min(box2_zp) > laser_zmax
-                assert np.max(box2_zp) < laser_zmax + box2_width
-                print('ppp box2 = ', box_particle_number / cfg.nx / cfg.ny)
-            else:
-                box2_zp = np.array([])
-                box2_xp = np.array([])
-                box2_yp = np.array([])
-                box2_size = np.array([])
-
-            # import matplotlib.pyplot as plt
-            # plt.figure()
-            # plt.scatter(self.z, np.ones_like(self.z))
-            # if len(box1_zp) > 0:
-            #     plt.scatter(box1_zp, np.ones_like(box1_zp))
-            # if len(box2_zp) > 0:
-            #     plt.scatter(box2_zp, np.ones_like(box2_zp))
-            # plt.show()
-
-            # number of lost particles
-            _newz = self.z + dz  # move the original particles and check if they leave the laser sheet
-            z_lost_flag = (_newz < laser_zmin) | (_newz > laser_zmax)
-            n_lost = np.sum((_newz < laser_zmin) | (_newz > laser_zmax))
-            print('number of lost particles in z direction: ', n_lost)
-            print('relative loss [%]: ', n_lost / len(self.z) * 100)
-
-            # remaining z:
-            remaining_z = self.z[~z_lost_flag]
-            remaining_x = self.x[~z_lost_flag]
-            remaining_y = self.y[~z_lost_flag]
-            remaining_size = self.size[~z_lost_flag]
-            n_remaining = len(remaining_z)
-            assert n_remaining + n_lost == len(self.z)
-
-            box_size = np.concatenate([box1_size, box2_size])[0:n_lost]
-            box_xp = np.concatenate([box1_xp, box2_xp])[0:n_lost]
-            box_yp = np.concatenate([box1_yp, box2_yp])[0:n_lost]
-            box_zp = np.concatenate([box1_zp, box2_zp])[0:n_lost]
-
-            size = np.concatenate([remaining_size, box_size])
-
-            new_x = np.concatenate([remaining_x, box_xp])
-            new_y = np.concatenate([remaining_y, box_yp])
-            curr_z = np.concatenate([remaining_z, box_zp])
-
-            new_z = curr_z + dz
-
-            flag = np.where(new_x >= 0) and np.where(new_x < cfg.nx) and np.where(new_y >= 0) and np.where(
-                new_y < cfg.ny) and np.where(new_z >= laser_zmin) and np.where(new_z < laser_zmax)
-
-            # TODO: flagging will reduce the number of particles. So we need to add more particles to keep the same ppp
-            x = new_x[flag]
-
-            # yflag = np.where(new_y >= 0) and np.where(new_y < cfg.ny)
-            y = new_y[flag]
-
-            # zflag = np.where(new_z >= laser_zmin) and np.where(new_z < laser_zmax)
-            z = new_z[flag]
-
-            size = size[flag]
-
-            new = ParticleInfo(x, y, z, size)
-
-            # plt.scatter(self.z, np.ones_like(self.z) * 0.9)
-            # plt.show()
-
-            new_particle_number = len(new.z)
-            new_ppp = new_particle_number / cfg.nx / cfg.ny
-
-            print(current_ppp, '-->', new_ppp)
-        else:
-            new = copy.deepcopy(self)
-
-        if dx is not None:
-            new.x += dx
-
-        if dy is not None:
-            new.y += dy
-
-        return new
+        warnings.warn('Note, that this will not create new particles, but only displace the existing ones, '
+                      'which might leave the laser sheet!')
+        new_x = self.x + dx
+        new_y = self.y + dy
+        new_z = self.z + dz
+        return ParticleInfo(x=new_x, y=new_y, z=new_z, size=self.size, intensity=np.empty_like(self.intensity))
 
 
 def particle_location_from_file(filename: str) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
@@ -553,15 +247,6 @@ def generate_image(
                              f'{config["particle_number"]}')
         n_particles = int(config.particle_number)
         assert n_particles > 0
-        pmean = config.particle_size_mean  # mean particle size
-        pstd = config.particle_size_std  # standard deviation of particle size
-        pmin = pmean - 3 * pstd  # min particle size is 3*sigma below mean psize
-        if pmin < PMIN_ALLOWED:
-            warnings.warn(f'Particles smaller then {PMIN_ALLOWED} are set to {PMIN_ALLOWED}.')
-            pmin = PMIN_ALLOWED
-            if pmean <= pmin:
-                raise ValueError('Mean particle size must be larger than smallest particle size!')
-        pmax = pmean + 3 * pstd  # max particle size is 3*sigma above mean psize
 
     ppp = n_particles / image_size  # real ppp
 
@@ -584,20 +269,13 @@ def generate_image(
         else:
             xp = np.random.random(n_particles) * image_shape[1]
             yp = np.random.random(n_particles) * image_shape[0]
-        zp = np.random.random(n_particles) * zminmax * 2 - zminmax  # physical location in laser sheet! TODO: units??!!
+        zp = np.random.random(n_particles) * zminmax * 2 - zminmax  # physical location in laser sheet!
         # we should not clip the normal distribution
         # particle_sizes = np.clip(np.random.normal(pmean, pstd, n_particles), pmin, pmax)
         # but rather redo the normal distribution for the outliers:
-        if pstd > 0:
-            particle_sizes = np.random.normal(pmean, pstd, n_particles)
-        else:
-            particle_sizes = np.ones(n_particles) * pmean
-        iout = np.argwhere((particle_sizes < pmin) | (particle_sizes > pmax))
-        for i in iout[:, 0]:
-            dp = np.random.normal(pmean, pstd)
-            while dp < pmin or dp > pmax:
-                dp = np.random.normal(pmean, pstd)
-            particle_sizes[i] = dp
+        particle_sizes = generate_particle_size_distribution(
+            mean=config.particle_size_mean, std=config.particle_size_std, n=n_particles
+        )
 
     # illuminate:
     if config.particle_size_illumination_dependency:

@@ -3,6 +3,7 @@ import xarray as xr
 from scipy import interpolate
 
 from .core import ParticleInfo, SynPivConfig
+from .utils import generate_particle_size_distribution
 
 
 class VelocityField:
@@ -94,6 +95,8 @@ class VelocityField:
         remaining_orig_x = new_orig_part_x[laser_area]
         remaining_orig_y = new_orig_part_y[laser_area]
         remaining_orig_z = new_orig_part_z[laser_area]
+        remaining_orig_size = part_info.size[laser_area]
+
         n_out_of_plane = len(part_info.z) - len(remaining_orig_z)
         print(f'Number of particles left the field: {n_out_of_plane}')
         print(f'Percentage of particles left the field: {n_out_of_plane / len(part_info.z) * 100}%')
@@ -102,7 +105,7 @@ class VelocityField:
         target_particle_number = cfg.particle_number
         # current ppp:
         current_particle_number = len(remaining_orig_z)
-        current_ppp = current_particle_number / (cfg.nx * cfg.ny * cfg.laser_width)
+        # current_ppp = current_particle_number / (cfg.nx * cfg.ny * cfg.laser_width)
 
         n_missing = int(target_particle_number - current_particle_number)
 
@@ -145,11 +148,15 @@ class VelocityField:
         total_count = len(new_particles_z) + len(remaining_orig_z)
         print(f'Total number of particles: {total_count}')
         print(f'ppp: {total_count / (cfg.nx * cfg.ny)} (target={cfg.particle_number / (cfg.nx * cfg.ny)})')
-
+        new_sizes = generate_particle_size_distribution(
+            mean=cfg.particle_size_mean,
+            std=cfg.particle_size_std,
+            n=len(new_particles_z)
+        )
         return ParticleInfo(x=np.concatenate((remaining_orig_x, new_particles_x)),
                             y=np.concatenate((remaining_orig_y, new_particles_y)),
                             z=np.concatenate((remaining_orig_z, new_particles_z)),
-                            size=cfg.particle_size_mean * np.ones(total_count))  # TODO: FIXME!
+                            size=np.concatenate((remaining_orig_size, new_sizes)))
 
 
 class ConstantField:
@@ -267,12 +274,6 @@ class ConstantField:
         # move new particles if they fall inside the new laser sheet until ppp is reached
         missing_particles = cfg.particle_number - len(x)
 
-        i = 0
-
-        def generate_size(cfg):
-            # TODO: Fix this
-            return cfg.particle_size_mean
-
         while missing_particles > 0:
             box_xp, box_yp, box_zp = _create_new_particles_around_fov(missing_particles)
 
@@ -284,15 +285,14 @@ class ConstantField:
             # check if they are within laser sheet:
             laser_area = (new_part_z > laser_zmin) & (new_part_z < laser_zmax) & (new_part_x > 0) & (
                     new_part_x < cfg.nx) & (new_part_y >= 0) & (new_part_y < cfg.ny)
-            # new_part_x = new_part_x[laser_area]
-            # new_part_y = new_part_y[laser_area]
-            # new_part_z = new_part_z[laser_area]
 
             x = np.concatenate((x, new_part_x[laser_area]))
             y = np.concatenate((y, new_part_y[laser_area]))
             z = np.concatenate((z, new_part_z[laser_area]))
-            # TODO: fix generating corret particle sizes!
-            size = np.concatenate((size, np.ones(np.sum(laser_area)) * cfg.particle_size_mean))
+            new_sizes = generate_particle_size_distribution(mean=cfg.particle_size_mean,
+                                                            std=cfg.particle_size_std,
+                                                            n=np.sum(laser_area))
+            size = np.concatenate((size, new_sizes))
 
             missing_particles -= np.sum(laser_area)
 
@@ -300,59 +300,3 @@ class ConstantField:
         print(f"ppp: {len(x) / (cfg.nx * cfg.ny)}")
 
         return ParticleInfo(x, y, z, size)
-
-# class RandomUniformField:
-#     def __init__(self, dx: float, dy: float, dz: float):
-#         self.dx = dx
-#         self.dy = dy
-#         self.dz = dz
-#
-#     def displace(self, part_info: ParticleInfo):
-#
-#         return VelocityField(dx=np.random.uniform(dx[0], dx[1], size=len(part_infoA)),
-#                              dy=np.random.uniform(dy[0], dy[1], size=len(part_infoA)),
-#                              dz=np.random.uniform(dz[0], dz[1], size=len(part_infoA)))
-
-#
-# u = xr.DataArray(data=np.random.rand(10, 10) * 10,
-#                  dims=('iy', 'ix'),
-#                  coords={'iy': np.arange(0, 10),
-#                          'ix': np.arange(0, 10)})
-# v = xr.DataArray(data=np.random.rand(10, 10) * 10 + 10,
-#                  dims=('iy', 'ix'),
-#                  coords={'iy': np.arange(0, 10),
-#                          'ix': np.arange(0, 10)})
-#
-# # particle data:
-# xp = np.random.uniform(0, 10, 100)
-# yp = np.random.uniform(0, 10, 100)
-#
-# # interpolate the velocity field to the particle positions
-# up = u.interp(ix=xp, iy=yp)
-# vp = v.interp(ix=xp, iy=yp)
-#
-# import matplotlib.pyplot as plt
-#
-# plt.figure()
-# plt.quiver(u.ix, u.iy, u.data, v.data)
-# for _xp, _yp in zip(xp, yp):
-#     plt.quiver(_xp, _yp, up.sel(ix=_xp, iy=_yp), vp.sel(ix=_xp, iy=_yp), color='r')
-# plt.show()
-#
-# # 1d case (velocity on simulatio boundary):
-# x = np.arange(0, 10)
-# u = xr.DataArray(data=np.random.random(10) * 10,
-#                  dims=('ix',),
-#                  coords={'ix': x})
-# v = xr.DataArray(data=np.random.random(10) * 10 + 10,
-#                  dims=('ix',),
-#                  coords={'ix': x})
-# xp = np.random.uniform(-2, 12, 10)
-#
-# up = u.interp(ix=xp)
-# vp = v.interp(ix=xp)
-#
-# plt.figure()
-# plt.quiver(u.ix, np.zeros_like(u.ix), u.data, v.data)
-# plt.quiver(xp, xp*0, up, vp, color='r')
-# plt.show()
