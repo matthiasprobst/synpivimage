@@ -50,6 +50,8 @@ To generate synthetic particle images, configure a `ConfigManager`. It take the 
 and writing the data to an `HDF5` file. For more explanation follow the
 example `jupyter notebook` [here](./examples/generate_datasets.ipynb).
 
+### Simple A-B-image generation:
+
 ```python
 import numpy as np
 
@@ -66,6 +68,35 @@ cfg.particle_size_std = 1
 
 # Set up the dictionary with variable ranges that will be varied:
 image_size = cfg.nx * cfg.ny
+
+from synpivimage import generate_image
+
+imgA, attrsA, part_infoA = generate_image(
+    cfg,
+    particle_data=None
+)
+
+# displace the particles (here a random displacement):
+displaced_particle_data = part_infoA.displace(
+    dx=np.random.uniform(low=-1, high=1, size=len(part_infoA)),
+    dy=np.random.uniform(low=-1, high=1, size=len(part_infoA))
+)
+
+imgB, attrsB, part_infoB = generate_image(
+    cfg,
+    particle_data=displaced_particle_data
+)
+
+from synpivimage import io
+
+io.imwrite8('img8_A.tif', imgA)
+io.imwrite8('img8_B.tif', imgB)
+```
+
+### Varying multiple parameters at once:
+
+```python
+
 variation_dict = {'particle_number': np.arange(1, image_size * 0.1, 20).astype(int),
                   'particle_size_mean': (2, 3),
                   'laser_shape_factor': (1, 10)}
@@ -81,16 +112,3 @@ hdf_filename = CFGs.generate(data_directory='example_data_dir',
                              nproc=4, n_split=1000, overwrite=True)
 ```
 
-### Read/Write images
-
-The package - although not responsible for it - provides a simple interface to read and write images:
-
-*Write 16 bit images:*
-
-```python
-from synpivimage import io
-
-img = ...  # get it from the HDF5 file
-io.imwrite16('img16_A.tif', img)
-io.imwrite8('img8_A.tif', img)
-```

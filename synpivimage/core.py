@@ -48,12 +48,18 @@ DEBUG_PLOT = False
 
 @dataclass
 class ParticleInfo:
-    """Dataclass holding particle position, size and intensity information"""
+    """Dataclass holding particle position, size and intensity information
+
+    Note: The length of the object is the number of particles!
+    """
     x: np.ndarray
     y: np.ndarray
     z: np.ndarray
     size: np.ndarray
     intensity: Union[np.ndarray, None] = None
+
+    def __len__(self):
+        return len(self.x)
 
     def __post_init__(self):
         if isinstance(self.x, (int, float)):
@@ -557,7 +563,7 @@ def generate_image(
         else:
             xp = np.random.random(n_particles) * image_shape[1]
             yp = np.random.random(n_particles) * image_shape[0]
-        zp = np.random.random(n_particles) * zminmax*2 - zminmax  # physical location in laser sheet! TODO: units??!!
+        zp = np.random.random(n_particles) * zminmax * 2 - zminmax  # physical location in laser sheet! TODO: units??!!
         # we should not clip the normal distribution
         # particle_sizes = np.clip(np.random.normal(pmean, pstd, n_particles), pmin, pmax)
         # but rather redo the normal distribution for the outliers:
