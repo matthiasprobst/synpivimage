@@ -8,7 +8,6 @@ from typing import Union
 class SynPivConfig(BaseModel):
     ny: int
     nx: int
-    square_image: bool
     bit_depth: int
     noise_baseline: float
     dark_noise: float  # noise_baseline: 20, dark_noise: 2.29,
@@ -22,8 +21,9 @@ class SynPivConfig(BaseModel):
     laser_shape_factor: int = 2
     image_particle_peak_count: int = 1000
     # laser_max_intensity: 1000
-    particle_position_file: Union[str, pathlib.Path, None] = None
-    particle_size_illumination_dependency: bool = True
+    particle_position_file: Union[str, pathlib.Path, None] = None  # deprecated
+    particle_size_illumination_dependency: bool = False
+    square_image: bool = False
 
     def __getitem__(self, item):
         warnings.warn(f'Please use .{item}', DeprecationWarning)

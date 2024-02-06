@@ -53,7 +53,7 @@ example `jupyter notebook` [here](./examples/generate_datasets.ipynb).
 ### Simple A-B-image generation:
 
 ```python
-import numpy as np
+
 
 import synpivimage as spi
 
@@ -76,11 +76,13 @@ imgA, attrsA, part_infoA = generate_image(
     particle_data=None
 )
 
-# displace the particles (here a random displacement):
-displaced_particle_data = part_infoA.displace(
-    dx=np.random.uniform(low=-1, high=1, size=len(part_infoA)),
-    dy=np.random.uniform(low=-1, high=1, size=len(part_infoA))
-)
+# displace the particles (here a random displacement)
+# We need to use the special class to displace the particles as it will 
+# take care of new particles moving into the laser light sheet
+from synpivimage import velocityfield
+
+cfield = velocityfield.ConstantField(dx=2.3, dy=1.6, dz=0)
+displaced_particle_data = cfield.displace(cfg=cfg, part_info=part_infoA)
 
 imgB, attrsB, part_infoB = generate_image(
     cfg,
