@@ -1,6 +1,13 @@
 # synpivimage
 
-Tool to build synthetic Particle Image Velocimetry (PIV) images.
+Tool to build synthetic Particle Image Velocimetry (PIV) images based on commonly accepted literature.
+
+It uses the commonly used assumptions and DOES NOT include optical aberrations, such as lens distortion or such. Noise
+can be added and particles can be moved, to create a synthetic A-B-image pair.
+
+A GUI helps to investigate the effect of the parameters on the image(s).
+
+**Note, that this package is still under development and the API might change.**
 
 The image particles density distribution is modelled as described in the Book "Particle Image Velocimetry: A Practical
 Guide" by Raffel et al. (https://doi.org/10.1007/978-3-319-68852-7).
