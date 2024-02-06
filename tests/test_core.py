@@ -9,6 +9,7 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 import synpivimage.core
 from synpivimage import build_ConfigManager, generate_image
 from synpivimage import get_default
+from synpivimage import velocityfield
 
 __this_dir__ = pathlib.Path(__file__).parent
 
@@ -181,11 +182,11 @@ class TestCore(unittest.TestCase):
         cfg.nx = 100
         cfg.ny = 100
         cfg.laser_width = 1
-        cfg.particle_number = 0.1*cfg.nx*cfg.ny
+        cfg.particle_number = 0.1 * cfg.nx * cfg.ny
         imgA, attrsA, part_infoA = generate_image(
             cfg
         )
-        cfg.laser_shape_factor = 10**3
+        cfg.laser_shape_factor = 10 ** 3
         print(cfg.particle_number)
 
         imgB, attrsB, part_infoB = generate_image(
@@ -227,8 +228,11 @@ class TestCore(unittest.TestCase):
         part_infoA.displace(cfg, dx=2, dy=1, dz=-1)  #
         imgB, attrsB, part_infoB = generate_image(
             cfg,
-            particle_data= part_infoA.displace(cfg, dx=2, dy=1, dz=-1)
+            particle_data=part_infoA.displace(cfg, dx=2, dy=1, dz=-1)
         )
+
+        np.testing.assert_equal(part_infoB.x, part_infoA.x + 2)
+
         fig, axs = plt.subplots(1, 2, sharex=True, sharey=True)
         imgAmax = imgA.max()
         im = axs[0].imshow(imgA, cmap='gray', vmin=0, vmax=imgAmax)
@@ -244,3 +248,80 @@ class TestCore(unittest.TestCase):
         cb = plt.colorbar(im, cax=cax)
 
         plt.show()
+
+    def test_constant_displacement(self):
+        cfg = get_default()
+
+        cfg.bit_depth = 16
+        cfg.nx = 512
+        cfg.ny = 512
+        cfg.square_image = True
+
+        cfg.particle_size_mean = 2.5
+        cfg.particle_size_std = 0
+
+        cfg.particle_number = 1 / 64 * cfg.nx * cfg.ny
+        self.assertEqual(cfg.particle_number, 1 / 64 * 512 * 512)
+
+        cfg.image_particle_peak_count = 1000
+
+        cfg.dark_noise = 4  # std
+        cfg.noise_baseline = 100  # mean
+        cfg.shot_noise = True
+
+        cfg.qe = 1  # 1e-/count thus 4 baseline noise instead of 16
+        cfg.sensitivity = 1  # ADU/e-
+        cfg.laser_shape_factor = 10000
+        imgA, attrsA, part_infoA = generate_image(
+            cfg
+        )
+        self.assertEqual(len(part_infoA), cfg.particle_number)
+
+        cfield = velocityfield.ConstantField(dx=2.3, dy=1.6, dz=0)
+        displaced_particle_data = cfield.displace(cfg=cfg, part_info=part_infoA)
+
+        imgB, attrsB, part_infoB = generate_image(
+            cfg,
+            particle_data=displaced_particle_data
+        )
+
+    def test_displace_with_velocity_field(self):
+        cfg = get_default()
+
+        cfg.bit_depth = 16
+        cfg.nx = 512
+        cfg.ny = 512
+        cfg.square_image = True
+
+        cfg.particle_size_mean = 2.5
+        cfg.particle_size_std = 0
+
+        cfg.particle_number = 1 / 64 * cfg.nx * cfg.ny
+        self.assertEqual(cfg.particle_number, 1 / 64 * 512 * 512)
+
+        cfg.image_particle_peak_count = 1000
+
+        cfg.dark_noise = 4  # std
+        cfg.noise_baseline = 100  # mean
+        cfg.shot_noise = True
+
+        cfg.qe = 1  # 1e-/count thus 4 baseline noise instead of 16
+        cfg.sensitivity = 1  # ADU/e-
+        cfg.laser_shape_factor = 10000
+        imgA, attrsA, part_infoA = generate_image(
+            cfg
+        )
+        self.assertEqual(len(part_infoA), cfg.particle_number)
+
+        x = np.arange(-1, cfg.nx + 1, 1)
+        y = np.arange(-1, cfg.ny + 1, 1)
+        z = np.linspace(-cfg.laser_width - 1, cfg.laser_width + 1, 4)
+
+        randomfield = velocityfield.VelocityField(x=x,
+                                                  y=y,
+                                                  z=z,
+                                                  u=np.random.uniform(-1, 1, (len(z), len(y), len(x))),
+                                                  v=np.random.uniform(-1, 1, (len(z), len(y), len(x))),
+                                                  w=np.zeros((len(z), len(y), len(x)))
+                                                  )
+        new_loc = randomfield.displace(cfg, part_info=part_infoA)

@@ -102,13 +102,27 @@ class ParticleInfo:
 
         return part_infos
 
-    def displace(self, cfg, dx=None, dy=None, dz=None):
+    def displace(self,
+                 cfg: SynPivConfig,
+                 dx: Union[float, int, np.ndarray, None] = None,
+                 dy: Union[float, int, np.ndarray, None] = None,
+                 dz: Union[float, int, np.ndarray, None] = None) -> "ParticleInfo":
+        """Displace the particles in x, y and z direction and return a new ParticleInfo object"""
+        zero_displacement = np.zeros_like(self.x)
         if dz is None:
-            dz = 0
-        if dy is None:
-            dy = 0
-        if dx is None:
-            dx = 0
+            dz = zero_displacement
+        elif isinstance(dz, (int, float)):
+            dz = np.ones_like(self.x) * dz
+        if isinstance(dy, (int, float)):
+            dy = np.ones_like(self.x) * dy
+        elif dy is None:
+            dy = zero_displacement
+        if isinstance(dx, (int, float)):
+            dx = np.ones_like(self.x) * dx
+        elif dx is None:
+            dx = zero_displacement
+
+        assert len(dx) == len(dy) == len(dz) == len(self.x)
 
         laser_zmin = -cfg.laser_width / 2
         laser_zmax = cfg.laser_width / 2
@@ -118,18 +132,22 @@ class ParticleInfo:
         particle_depth_density = particle_number / (laser_zmax - laser_zmin)  # particles per laser depth
 
         # compute the source location of the particles
-        source_x = self.x - np.ceil(dx)
-        source_y = self.y - np.ceil(dy)
-        source_z = self.z - np.ceil(dz)
+        dx_max = np.max(dx)
+        dy_max = np.max(dy)
+        dz_max = np.max(dz)
+
+        source_x = self.x - np.ceil(dx_max)
+        source_y = self.y - np.ceil(dy_max)
+        source_z = self.z - np.ceil(dz_max)
 
         def _create_new_particles_around_fov(n_particles_box: int = None):
-            fac = 0
-            box_x_min = min(min(source_x), min(self.x)) - fac * np.abs(dx)
-            box_x_max = max(max(source_x), max(self.x)) + fac * np.abs(dx)
-            box_y_min = min(min(source_y), min(self.y)) - fac * np.abs(dy)
-            box_y_max = max(max(source_y), max(self.y)) + fac * np.abs(dy)
-            box_z_min = min(min(source_z), min(self.z)) - fac * np.abs(dz)
-            box_z_max = max(max(source_z), max(self.z)) + fac * np.abs(dz)
+            # fac = 0
+            box_x_min = min(min(source_x), min(self.x))  # - fac * np.abs(dx)
+            box_x_max = max(max(source_x), max(self.x))  # + fac * np.abs(dx)
+            box_y_min = min(min(source_y), min(self.y))  # - fac * np.abs(dy)
+            box_y_max = max(max(source_y), max(self.y))  # + fac * np.abs(dy)
+            box_z_min = min(min(source_z), min(self.z))  # - fac * np.abs(dz)
+            box_z_max = max(max(source_z), max(self.z))  # + fac * np.abs(dz)
 
             # print('Bounding box: ', box_x_min, box_x_max, box_y_min, box_y_max, box_z_min, box_z_max)
 
@@ -212,9 +230,12 @@ class ParticleInfo:
                 i = 0
             if len(box_xp) == 0:
                 break
-            new_part_x = box_xp[i] + dx
-            new_part_y = box_yp[i] + dy
-            new_part_z = box_zp[i] + dz
+
+            new_part_x = box_xp[i] + box_dx[i]
+            new_part_y = box_yp[i] + box_dy[i]
+            new_part_z = box_zp[i] + box_dz[i]
+            # now, append the particle if it is inside the laser sheet
+
             if new_part_z > laser_zmin and new_part_z < laser_zmax and new_part_x > 0 and new_part_x < cfg.nx and new_part_y >= 0 and new_part_y < cfg.ny:
                 x = np.append(x, new_part_x)
                 y = np.append(y, new_part_y)
