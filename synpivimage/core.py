@@ -6,6 +6,7 @@ import numpy as np
 import os
 import pathlib
 import random
+import scipy
 import warnings
 import xarray as xr
 import yaml
@@ -20,12 +21,17 @@ from ._version import __version__
 from .config import SynPivConfig, get_default
 from .utils import generate_particle_size_distribution
 
+SQRT2 = np.sqrt(2)
 # from .noise import add_camera_noise
 
 __this_dir__ = pathlib.Path(__file__).parent
 
 SNT_FILENAME = __this_dir__ / 'standard_name_translation.yaml'
 
+# this value is multiplied with max(sig_x, sig_y) which will be the radius around the particle, where the sensor is
+# influenced by the particle. Reducing it, reduces computation time, but it should not be too small, otherwise the
+# particle influence is not correctly calculated
+PARTICLE_INFLUENCE_FACTOR = 6
 try:
     import h5rdmtoolbox as h5tbx
 
@@ -90,11 +96,11 @@ class ParticleInfo:
         with h5tbx.File(hdf_filename) as h5:
             grp_part_info = h5['particle_infos']
             for k, v in grp_part_info.items():
-                x = v['x'][()]
-                y = v['y'][()]
-                z = v['z'][()]
-                size = v['size'][()]
-                intensity = v['intensity'][()]
+                x = v['x'][()].data
+                y = v['y'][()].data
+                z = v['z'][()].data
+                size = v['size'][()].data
+                intensity = v['intensity'][()].data
                 part_infos.append(cls(x=x, y=y, z=z, size=size, intensity=intensity))
 
         return part_infos
@@ -171,7 +177,7 @@ def read_config(filename: Union[str, bytes, os.PathLike]) -> Dict:
 
 def generate_image(
         config: SynPivConfig,
-        particle_data: Union[ParticleInfo, None] = None,
+        particle_data: Union[ParticleInfo, dict, None] = None,
         **kwargs) -> Tuple[np.ndarray, Dict, ParticleInfo]:
     """
     Generates a particle image based on a config (file). The generated image and the
@@ -192,10 +198,22 @@ def generate_image(
                       DeprecationWarning)
         config = yaml2dict(config)
 
+    if isinstance(particle_data, dict):
+        n_particles = config.particle_number
+        particle_data = ParticleInfo(
+            x=particle_data.get('x', np.random.uniform(0, config.nx, n_particles)),
+            y=particle_data.get('y', np.random.uniform(0, config.ny, n_particles)),
+            z=particle_data.get('z', np.random.uniform(-config.laser_width / 2, config.laser_width / 2, n_particles)),
+            size=particle_data.get('size',
+                                   generate_particle_size_distribution(
+                                       mean=config.particle_size_mean,
+                                       std=config.particle_size_std,
+                                       n=n_particles
+                                   )
+                                   )
+        )
+
     # read and process configuration:
-    if config['square_image']:
-        config.ny = max(config.nx, config.ny)
-        config.nx = config.ny
     image_shape = (config.ny, config.nx)
     image_size = image_shape[0] * image_shape[1]
 
@@ -256,6 +274,7 @@ def generate_image(
 
     # seed particles:
     irrad_photons = np.zeros(image_shape)
+
     if particle_data is None:
         xy_seeding_method = kwargs.pop('xy_seeding_method', 'random')
         # zminmax = _compute_max_z_position_from_laser_properties(dz0, s)
@@ -267,8 +286,8 @@ def generate_image(
             xp = xx.ravel()
             yp = yy.ravel()
         else:
-            xp = np.random.random(n_particles) * image_shape[1]
-            yp = np.random.random(n_particles) * image_shape[0]
+            xp = np.random.uniform(0, image_shape[1], n_particles)
+            yp = np.random.uniform(0, image_shape[0], n_particles)
         zp = np.random.random(n_particles) * zminmax * 2 - zminmax  # physical location in laser sheet!
         # we should not clip the normal distribution
         # particle_sizes = np.clip(np.random.normal(pmean, pstd, n_particles), pmin, pmax)
@@ -277,12 +296,12 @@ def generate_image(
             mean=config.particle_size_mean, std=config.particle_size_std, n=n_particles
         )
 
-    # illuminate:
-    if config.particle_size_illumination_dependency:
-        part_intensity = particle_intensity(zp, dz0, s, dp=particle_sizes)
-        part_intensity = part_intensity / (np.pi * max(particle_sizes) ** 2 / 8)
-    else:
-        part_intensity = particle_intensity(zp, dz0, s)
+    # # illuminate:
+    # if config.particle_size_illumination_dependency:
+    #     part_intensity = particle_intensity(zp, dz0, s, dp=particle_sizes)
+    #     part_intensity = part_intensity  # / (np.pi * max(particle_sizes) ** 2 / 32)  # or /8 ?
+    # else:
+    part_intensity = particle_intensity(zp, dz0, s)
 
     # Computation of the particle intensity:
     # particle intensity = laser intensity x q x sensor gain
@@ -292,14 +311,43 @@ def generate_image(
     # part_intensity [0, 1]
     # q --> bit depth, e.g. 8 or 16
 
-    relative_laser_intensity = config.image_particle_peak_count / (
-            2 ** config.bit_depth) / config.qe / config.sensitivity
-    part_intensity = part_intensity * 2 ** bit_depth * relative_laser_intensity
+    if particle_data is None:
+        mean_psize = config.particle_size_mean
+    else:
+        mean_psize = np.mean(particle_data.size)
+
+    if config.particle_size_definition == 'e2':  # Raffel 1998
+        sigmax = mean_psize / 4  # 4 sigma = particle size --> where intensity drops to e-2
+        sigmay = sigmax
+    elif config.particle_size_definition == 'I2':  # Lecordier, Westerweel, 2003
+        sigmax = mean_psize / (2 * np.sqrt(2 * np.log(2)))
+        sigmay = sigmax
+    elif config.particle_size_definition == '2sigma':  # Wienecke
+        sigmax = mean_psize / 2
+        sigmay = sigmax
+    else:
+        raise ValueError(f'Invalid particle size definition: {config.particle_size_definition}.')
+
+    # Note, that Lecordier, Westerweel in SIG use I/2 definition, which is sigmax = psize/(sqrt(2*ln2))
+
+    erf1 = (scipy.special.erf(0.5 / np.sqrt(2) / sigmax) - scipy.special.erf(
+        -0.5 / np.sqrt(2) / sigmax))
+    erf2 = (scipy.special.erf(0.5 / np.sqrt(2) / sigmay) - scipy.special.erf(
+        -0.5 / np.sqrt(2) / sigmay))
+    max_part_count = np.pi / 8 * mean_psize ** 2 * sigmax * sigmay * erf1 * erf2
+    relative_laser_intensity = config.image_particle_peak_count / max_part_count / config.qe / config.sensitivity
+
+    # the image particle peak count refers to the particle image intensity of a particle
+    # located at z=0 (e.g. full laser energy).
+    # This is also a function of the particle size, hence the mean particle size is taken
+
+    part_intensity = part_intensity * relative_laser_intensity
     ny, nx = image_shape
-    # nsigma = 4
+
+    frx = config.fill_ratio_y  # ccd_fill_ratio_x
+    fry = config.fill_ratio_x  # ccd_fill_ratio_x
     for x, y, psize, pint in zip(xp, yp, particle_sizes, part_intensity):
-        delta = int(
-            10 * psize)  # range plus minus the particle position, which changes the counts. theoretically all pixels must be changed, but it is only significant cose by
+        delta = int(PARTICLE_INFLUENCE_FACTOR * max(sigmax, sigmay))
         xint = int(x)
         yint = int(y)
         xmin = max(0, xint - delta)
@@ -310,8 +358,16 @@ def generate_image(
         px = x - xmin
         py = y - ymin
         xx, yy = np.meshgrid(range(sub_img_shape[1]), range(sub_img_shape[0]))
-        squared_dist = (px - xx) ** 2 + (py - yy) ** 2
-        irrad_photons[ymin:ymax, xmin:xmax] += np.exp(-8 * squared_dist / psize ** 2) * pint
+        # squared_dist = (px - xx) ** 2 + (py - yy) ** 2
+        # Raffel:
+        # according to sig:
+
+        erf1 = scipy.special.erf((xx - px + 0.5 * frx) / (sigmax * SQRT2)) - scipy.special.erf(
+            (xx - px - 0.5 * frx) / (sigmax * SQRT2))
+        erf2 = scipy.special.erf((yy - py + 0.5 * fry) / (sigmay * SQRT2)) - scipy.special.erf(
+            (yy - py - 0.5 * fry) / (sigmay * SQRT2))
+        Ip = np.pi / 8 * psize ** 2 * sigmax * sigmay * erf1 * erf2
+        irrad_photons[ymin:ymax, xmin:xmax] += Ip * pint
 
     # so far, we computed the "photons" emitted from the particle --> num_photons
 
@@ -357,6 +413,8 @@ def generate_image(
              # 'ps_mean': np.mean(particle_sizes),
              # 'ps_std': np.std(particle_sizes),
              'ppp': ppp,
+             'pattern_meanx': sigmax,
+             'pattern_meany': sigmay,
              'n_particles': n_particles,
              'laser_width': dz0,
              'laser_shape_factor': s,
@@ -365,6 +423,7 @@ def generate_image(
              'particle_size_std': config.particle_size_std,
              'image_particle_peak_count': config.image_particle_peak_count,
              'code_source': 'https://git.scc.kit.edu/da4323/piv-particle-density',
+             'particle_size_definition': config.particle_size_definition,
              'version': __version__}
 
     particle_info = ParticleInfo(**{'x': xp, 'y': yp, 'z': zp,
@@ -399,7 +458,7 @@ def _compute_max_z_position_from_laser_properties(dz0: float, s: int) -> float:
                    1 / (2 * s))
 
 
-def particle_intensity(z: np.ndarray, beam_width: float, s: int, dp: np.ndarray = None):
+def particle_intensity(z: np.ndarray, beam_width: float, s: int):
     """Intensity of a particle in the laser beam.
     Max intensity of laser is 1 in this function.
     In previous versions this could be set. Now, the user has to take care of it him/herself
@@ -417,16 +476,17 @@ def particle_intensity(z: np.ndarray, beam_width: float, s: int, dp: np.ndarray 
     dp: array-like
         image particle diameter
     """
-    dz0 = np.sqrt(2) * beam_width / 2
+    dz0 = np.sqrt(2) * beam_width / 2  # see Raffel
     if s == 0:
-        if dp is None:
-            return np.ones_like(z)
-        return np.ones_like(z) * dp ** 2 * np.pi / 8
+        return np.ones_like(z)
     # from eq 6.8 in PIV Book (Raffel et al. 2007) we get the laser intensity at z:
-    laser_intensity = np.exp(-1 / np.sqrt(2 * np.pi) * np.abs(2 * z ** 2 / dz0 ** 2) ** s)
-    if dp is None:
-        return laser_intensity
-    return laser_intensity * dp ** 2 * np.pi / 8
+    if s > 100:
+        laser_intensity = np.ones(z.shape)
+        laser_intensity[z > dz0] = 0
+        laser_intensity[z < -dz0] = 0
+    else:
+        laser_intensity = np.exp(-1 / np.sqrt(2 * np.pi) * np.abs(2 * z ** 2 / dz0 ** 2) ** s)
+    return laser_intensity
 
 
 def _generate(
@@ -464,8 +524,7 @@ def _generate(
         _nproc = CPU_COUNT
     else:
         _nproc = nproc
-    if cfgs[0].square_image:
-        cfgs[0].ny = cfgs[0].nx
+
     intensities = np.empty(shape=(len(cfgs), cfgs[0].ny, cfgs[0].nx))
     # intensities = xr.DataArray(name='intensity', dims=('y', 'x'),
     #                            data=np.empty(shape=(len(cfgs), cfgs[0].ny, cfgs[0].nx)))

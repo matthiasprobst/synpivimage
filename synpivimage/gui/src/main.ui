@@ -36,137 +36,19 @@
     <property name="geometry">
      <rect>
       <x>0</x>
-      <y>10</y>
+      <y>0</y>
       <width>241</width>
-      <height>681</height>
+      <height>731</height>
      </rect>
     </property>
     <property name="title">
      <string>Settings</string>
     </property>
-    <widget class="QWidget" name="formLayoutWidget">
-     <property name="geometry">
-      <rect>
-       <x>10</x>
-       <y>30</y>
-       <width>214</width>
-       <height>285</height>
-      </rect>
-     </property>
-     <layout class="QFormLayout" name="formLayout">
-      <item row="0" column="0">
-       <widget class="QLabel" name="label">
-        <property name="text">
-         <string>nx</string>
-        </property>
-       </widget>
-      </item>
-      <item row="0" column="1">
-       <widget class="QSpinBox" name="nx"/>
-      </item>
-      <item row="1" column="0">
-       <widget class="QLabel" name="label_2">
-        <property name="text">
-         <string>ny</string>
-        </property>
-       </widget>
-      </item>
-      <item row="1" column="1">
-       <widget class="QSpinBox" name="ny"/>
-      </item>
-      <item row="2" column="0">
-       <widget class="QLabel" name="label_3">
-        <property name="text">
-         <string>particle count</string>
-        </property>
-       </widget>
-      </item>
-      <item row="2" column="1">
-       <widget class="QSpinBox" name="particle_number"/>
-      </item>
-      <item row="3" column="0">
-       <widget class="QLabel" name="label_4">
-        <property name="text">
-         <string>dp mean</string>
-        </property>
-       </widget>
-      </item>
-      <item row="3" column="1">
-       <widget class="QDoubleSpinBox" name="particle_size_mean"/>
-      </item>
-      <item row="4" column="0">
-       <widget class="QLabel" name="label_5">
-        <property name="text">
-         <string>dp std</string>
-        </property>
-       </widget>
-      </item>
-      <item row="4" column="1">
-       <widget class="QDoubleSpinBox" name="particle_size_std"/>
-      </item>
-      <item row="5" column="0">
-       <widget class="QLabel" name="label_6">
-        <property name="text">
-         <string>laser width</string>
-        </property>
-       </widget>
-      </item>
-      <item row="5" column="1">
-       <widget class="QDoubleSpinBox" name="laser_width"/>
-      </item>
-      <item row="6" column="0">
-       <widget class="QLabel" name="label_7">
-        <property name="text">
-         <string>laser shape</string>
-        </property>
-       </widget>
-      </item>
-      <item row="6" column="1">
-       <widget class="QSpinBox" name="laser_shape_factor"/>
-      </item>
-      <item row="7" column="0">
-       <widget class="QLabel" name="label_12">
-        <property name="text">
-         <string>peak find</string>
-        </property>
-       </widget>
-      </item>
-      <item row="7" column="1">
-       <widget class="QComboBox" name="peak_find">
-        <item>
-         <property name="text">
-          <string>gaussian (3pt)</string>
-         </property>
-        </item>
-       </widget>
-      </item>
-      <item row="8" column="0">
-       <widget class="QLabel" name="label_13">
-        <property name="text">
-         <string>bit depth</string>
-        </property>
-       </widget>
-      </item>
-      <item row="8" column="1">
-       <widget class="QSpinBox" name="bit_depth"/>
-      </item>
-      <item row="9" column="0">
-       <widget class="QLabel" name="label_16">
-        <property name="text">
-         <string>particle intenstiy</string>
-        </property>
-       </widget>
-      </item>
-      <item row="9" column="1">
-       <widget class="QSpinBox" name="particle_count"/>
-      </item>
-     </layout>
-    </widget>
     <widget class="QWidget" name="formLayoutWidget_2">
      <property name="geometry">
       <rect>
        <x>10</x>
-       <y>320</y>
+       <y>370</y>
        <width>211</width>
        <height>131</height>
       </rect>
@@ -218,7 +100,7 @@
      <property name="geometry">
       <rect>
        <x>10</x>
-       <y>600</y>
+       <y>660</y>
        <width>191</width>
        <height>61</height>
       </rect>
@@ -231,9 +113,9 @@
      <property name="geometry">
       <rect>
        <x>10</x>
-       <y>460</y>
+       <y>500</y>
        <width>211</width>
-       <height>131</height>
+       <height>91</height>
       </rect>
      </property>
      <layout class="QFormLayout" name="formLayout_3">
@@ -261,6 +143,227 @@
        <widget class="QCheckBox" name="shotnoise">
         <property name="text">
          <string>shot noise</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+    <widget class="QWidget" name="formLayoutWidget_4">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>590</y>
+       <width>211</width>
+       <height>61</height>
+      </rect>
+     </property>
+     <layout class="QFormLayout" name="formLayout_4">
+      <item row="0" column="1">
+       <widget class="QComboBox" name="windowing">
+        <item>
+         <property name="text">
+          <string>uniform</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string>gaussian50</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string>gaussian25</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string>tophat</string>
+         </property>
+        </item>
+       </widget>
+      </item>
+      <item row="0" column="0">
+       <widget class="QLabel" name="label_18">
+        <property name="text">
+         <string>windowing</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+    <widget class="QWidget" name="formLayoutWidget">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>20</y>
+       <width>214</width>
+       <height>357</height>
+      </rect>
+     </property>
+     <layout class="QFormLayout" name="formLayout">
+      <item row="0" column="0">
+       <widget class="QLabel" name="label">
+        <property name="text">
+         <string>nx</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="1">
+       <widget class="QSpinBox" name="nx"/>
+      </item>
+      <item row="1" column="0">
+       <widget class="QLabel" name="label_2">
+        <property name="text">
+         <string>ny</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="1">
+       <widget class="QSpinBox" name="ny"/>
+      </item>
+      <item row="2" column="0">
+       <widget class="QLabel" name="label_3">
+        <property name="text">
+         <string>particle_density</string>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="1">
+       <widget class="QDoubleSpinBox" name="particle_density">
+        <property name="decimals">
+         <number>4</number>
+        </property>
+       </widget>
+      </item>
+      <item row="3" column="0">
+       <widget class="QLabel" name="label_4">
+        <property name="text">
+         <string>dp mean</string>
+        </property>
+       </widget>
+      </item>
+      <item row="3" column="1">
+       <widget class="QDoubleSpinBox" name="particle_size_mean"/>
+      </item>
+      <item row="5" column="0">
+       <widget class="QLabel" name="label_5">
+        <property name="text">
+         <string>dp std</string>
+        </property>
+       </widget>
+      </item>
+      <item row="5" column="1">
+       <widget class="QDoubleSpinBox" name="particle_size_std"/>
+      </item>
+      <item row="6" column="0">
+       <widget class="QLabel" name="label_19">
+        <property name="toolTip">
+         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Definition of what a image particle size is. All definitions are based on where a value of the gauss distribution is reached. &amp;quot;e2&amp;quot; is where the intensity reaches e-2. &amp;quot;I/2&amp;quot; uses half the intensity as the size definition, &amp;quot;2sigma&amp;quot; defines that the particle diameter is 2 sigma of the distribution.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+        </property>
+        <property name="text">
+         <string>psize definition</string>
+        </property>
+       </widget>
+      </item>
+      <item row="6" column="1">
+       <widget class="QComboBox" name="particle_size_definition">
+        <item>
+         <property name="text">
+          <string>e2</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string>I2</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string>2sigma</string>
+         </property>
+        </item>
+       </widget>
+      </item>
+      <item row="8" column="0">
+       <widget class="QLabel" name="label_6">
+        <property name="text">
+         <string>laser width</string>
+        </property>
+       </widget>
+      </item>
+      <item row="8" column="1">
+       <widget class="QDoubleSpinBox" name="laser_width"/>
+      </item>
+      <item row="9" column="0">
+       <widget class="QLabel" name="label_7">
+        <property name="text">
+         <string>laser shape</string>
+        </property>
+       </widget>
+      </item>
+      <item row="9" column="1">
+       <widget class="QSpinBox" name="laser_shape_factor"/>
+      </item>
+      <item row="10" column="0">
+       <widget class="QLabel" name="label_12">
+        <property name="text">
+         <string>peak find</string>
+        </property>
+       </widget>
+      </item>
+      <item row="10" column="1">
+       <widget class="QComboBox" name="peak_find">
+        <item>
+         <property name="text">
+          <string>gaussian</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string>parabolic</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string>centroid</string>
+         </property>
+        </item>
+       </widget>
+      </item>
+      <item row="11" column="0">
+       <widget class="QLabel" name="label_13">
+        <property name="text">
+         <string>bit depth</string>
+        </property>
+       </widget>
+      </item>
+      <item row="11" column="1">
+       <widget class="QSpinBox" name="bit_depth"/>
+      </item>
+      <item row="12" column="0">
+       <widget class="QLabel" name="label_16">
+        <property name="text">
+         <string>particle intenstiy</string>
+        </property>
+       </widget>
+      </item>
+      <item row="12" column="1">
+       <widget class="QSpinBox" name="particle_count"/>
+      </item>
+      <item row="7" column="1">
+       <widget class="QDoubleSpinBox" name="pattern_mean">
+        <property name="enabled">
+         <bool>false</bool>
+        </property>
+       </widget>
+      </item>
+      <item row="7" column="0">
+       <widget class="QLabel" name="label_17">
+        <property name="toolTip">
+         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Standard deviation of gaussian distribution used for particle image intensity.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+        </property>
+        <property name="text">
+         <string>pattern_mean</string>
         </property>
        </widget>
       </item>

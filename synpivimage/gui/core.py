@@ -7,6 +7,7 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QHBoxLayout
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+from scipy import signal
 from scipy.fft import rfft2, irfft2, fftshift
 
 import synpivimage as spi
@@ -20,9 +21,34 @@ __this_dir__ = pathlib.Path(__file__).parent
 INIT_DIR = __this_dir__
 
 
-def generate_correlation(imgA, imgB):
-    f2a = np.conj(rfft2(imgA))
-    f2b = rfft2(imgB)
+def normalize(arr):
+    return (arr - arr.min()) / (arr.max() - arr.min())
+
+
+def get_window(window_function, shape):
+    if window_function in ('gaussian50', 'gaussian25'):
+        ny, nx = shape
+        if window_function == 'gaussian50':
+            sy = ny / 2
+            sx = nx / 2
+        else:
+            sy = ny / 4
+            sx = nx / 4
+    elif window_function == 'tophat':
+        raise NotImplementedError()
+    else:
+        raise KeyError(f'Unknown window function: {window_function}')
+    return np.sqrt(np.outer(signal.gaussian(ny, sy), signal.gaussian(nx, sx)))
+
+
+def generate_correlation(imgA, imgB, window_function=None):
+    if window_function != 'uniform':
+        win = get_window(window_function, imgA.shape)
+        f2a = np.conj(rfft2(win * imgA))
+        f2b = rfft2(win * imgB)
+    else:
+        f2a = np.conj(rfft2(imgA))
+        f2b = rfft2(imgB)
     return fftshift(irfft2(f2a * f2b).real, axes=(-2, -1))
 
 
@@ -42,9 +68,10 @@ class Ui(QtWidgets.QMainWindow, Ui_MainWindow):
         self.ny.setValue(16)
         self.nx.setMaximum(1000)
         self.ny.setMaximum(1000)
-        self.particle_number.setMinimum(1)
-        self.particle_number.setValue(10)
-        self.particle_number.setMaximum(10 ** 5)
+        self.particle_density.setMinimum(0.000001)
+        self.particle_density.setMaximum(1)
+        self.particle_density.setValue(0.1)
+
         self.particle_size_mean.setMinimum(0.5)
         self.particle_size_mean.setValue(2.5)
         self.particle_size_std.setMinimum(0.0)
@@ -60,13 +87,18 @@ class Ui(QtWidgets.QMainWindow, Ui_MainWindow):
         self.particle_count.setMaximum(2 ** 16)
         self.particle_count.setValue(1000)
 
+        self.pattern_mean.setMinimum(0.01)
+        self.pattern_mean.setMaximum(100)
+        self.pattern_mean.setValue(1)
+
         self.dx.setMinimum(-100)
         self.dx.setMaximum(100)
-        self.dx.setValue(0.3)
 
         self.dy.setMinimum(-100)
         self.dy.setMaximum(100)
-        self.dy.setValue(0.6)
+
+        self.dx.setValue(0.6)
+        self.dy.setValue(0.3)
 
         self.dz.setMinimum(-100)
         self.dz.setMaximum(100)
@@ -93,8 +125,10 @@ class Ui(QtWidgets.QMainWindow, Ui_MainWindow):
         self.imgsA = np.empty(shape=(n_imgs, ny, nx))
         self.imgsB = np.empty(shape=(n_imgs, ny, nx))
         self.correlations = np.empty(shape=(n_imgs, ny, nx))
-        self.partA_infos = [{}] * n_imgs
-        self.partB_infos = [{}] * n_imgs
+        self.particle_dataA = [{}] * n_imgs
+        self.particle_dataB = [{}] * n_imgs
+        self.metasA = [{}] * n_imgs
+        self.metasB = [{}] * n_imgs
 
         plotting_layout1 = QHBoxLayout(self.plotwidget1)
         plotting_layout2 = QHBoxLayout(self.plotwidget2)
@@ -143,6 +177,7 @@ class Ui(QtWidgets.QMainWindow, Ui_MainWindow):
         self.btn_update.clicked.connect(self.update)
         # self.particle_number.valueChanged.connect(self.update)
         # self.particle_number.editingFinished.connect(self.update)
+        # self.apply_gauss_window.clicked.connect(self.update_with_existing_images)
 
         self.show()
 
@@ -151,16 +186,25 @@ class Ui(QtWidgets.QMainWindow, Ui_MainWindow):
         if event.key() == Qt.Key_F5:
             # Handle F5 key press
             self.update()
-        if event.key() == Qt.Key_F6:
+        elif event.key() == Qt.Key_F6:
+            self.update_with_existing_images()
+        elif event.key() == Qt.Key_F8:
             # Handle F6 key press
-            if self.curr_img_index == self.imgsA.shape[0]:
+            if self.curr_img_index == 0:
+                self.curr_img_index = self.imgsA.shape[0] - 1
+            else:
+                self.curr_img_index -= 1
+            self.update_plot()
+        elif event.key() == Qt.Key_F9:
+            # Handle F6 key press
+            if self.curr_img_index == self.imgsA.shape[0] - 1:
                 self.curr_img_index = 0
             else:
                 self.curr_img_index += 1
             self.update_plot()
 
     def get_config(self):
-        return spi.config.SynPivConfig(
+        self.current_config = spi.config.SynPivConfig(
             ny=self.ny.value(),
             nx=self.nx.value(),
             bit_depth=self.bit_depth.value(),
@@ -169,16 +213,23 @@ class Ui(QtWidgets.QMainWindow, Ui_MainWindow):
             laser_shape_factor=self.laser_shape_factor.value(),
             laser_width=self.laser_width.value(),
             noise_baseline=self.baseline.value(),
-            particle_number=self.particle_number.value(),
+            particle_number=int(self.particle_density.value() * self.ny.value() * self.nx.value()),
             particle_position_file=None,
             particle_size_illumination_dependency=True,
             particle_size_mean=self.particle_size_mean.value(),
             particle_size_std=self.particle_size_std.value(),
+            # pattern_meanx=self.pattern_mean.value(),
+            # pattern_meany=self.pattern_mean.value(),
+            fill_ratio_x=1.0,
+            fill_ratio_y=1.0,
             qe=1.,
             sensitivity=1.,
-            shot_noise=self.shotnoise.isChecked())
+            shot_noise=self.shotnoise.isChecked(),
+            particle_size_definition=self.particle_size_definition.currentText(),
+        )
+        return self.current_config
 
-    def generate_images(self):
+    def generate_images(self, take_existing_particles=False):
         cfg = self.get_config()
         assert cfg.nx == self.nx.value()
         assert cfg.ny == self.ny.value()
@@ -189,24 +240,55 @@ class Ui(QtWidgets.QMainWindow, Ui_MainWindow):
             self.imgsA = np.empty(shape=imgs_shape)
             self.imgsB = np.empty(shape=imgs_shape)
             self.correlations = np.empty(shape=imgs_shape)
-            self.partA_infos = [{}] * n_imgs
-            self.partB_infos = [{}] * n_imgs
+            self.particle_dataA = [{}] * n_imgs
+            self.particle_dataB = [{}] * n_imgs
+            self.metasA = [{}] * n_imgs
+            self.metasB = [{}] * n_imgs
 
         for i in range(n_imgs):
-            imgA, _, partA = spi.generate_image(
-                cfg
+            if take_existing_particles:
+                particle_dataA = self.particle_dataA[i]
+            else:
+                particle_dataA = None
+
+            imgA, self.metaA, partA = spi.generate_image(
+                cfg,
+                particle_data=particle_dataA
             )
 
             cfield = ConstantField(dx=self.dx.value(), dy=self.dy.value(), dz=self.dz.value())
-            imgB, _, partB = spi.generate_image(
+            if take_existing_particles:
+                particle_dataB = self.particle_dataA[i]
+            else:
+                particle_dataB = cfield.displace(cfg, partA)
+
+            imgB, self.metaB, partB = spi.generate_image(
                 cfg,
-                particle_data=cfield.displace(cfg, partA)
+                particle_data=particle_dataB
             )
             self.imgsA[i, ...] = imgA
             self.imgsB[i, ...] = imgB
 
-            self.partA_infos[i] = partA
-            self.partB_infos[i] = partB
+            self.particle_dataA[i] = partA
+            self.particle_dataB[i] = partB
+
+            self.metasA[i] = self.metaA
+            self.metasB[i] = self.metaB
+
+    def update_with_existing_images(self):
+        # compute correlations:
+        # if the particle size definition has changed, the images need to be regenerated
+        if self.particle_size_definition.currentText() != self.current_config.particle_size_definition:
+            self.current_config = self.get_config()
+            self.generate_images(take_existing_particles=True)
+        for i in range(self.imgsA.shape[0]):
+            self.correlations[i, ...] = generate_correlation(
+                self.imgsA[i, ...],
+                self.imgsB[i, ...],
+                self.windowing.currentText()
+            )
+        # plot images
+        self.update_plot()
 
     def update(self):
         self.curr_img_index = 0
@@ -216,61 +298,68 @@ class Ui(QtWidgets.QMainWindow, Ui_MainWindow):
         for i in range(self.imgsA.shape[0]):
             self.correlations[i, ...] = generate_correlation(
                 self.imgsA[i, ...],
-                self.imgsB[i, ...]
+                self.imgsB[i, ...],
+                self.windowing.currentText()
             )
         # plot images
         self.update_plot()
 
     def update_plot(self):
+        self.pattern_mean.setValue(self.metasA[self.curr_img_index]['pattern_meanx'])
         self._plot_imgA()
         self._plot_imgB()
         self._plot_correlation()
 
     def _plot_imgA(self):
         # plot imgA to self.plot11 widget
-        im = self.axes[0].imshow(self.imgsA[self.curr_img_index], cmap='gray')
+        self.axes[0].cla()
+        if self.windowing.currentText() != 'uniform':
+            win = get_window(self.windowing.currentText(), self.imgsA[self.curr_img_index].shape)
+            img = win * self.imgsA[self.curr_img_index]
+        else:
+            img = self.imgsA[self.curr_img_index]
+        im = self.axes[0].imshow(normalize(img), cmap='gray')
         plt.colorbar(im, cax=self.cax[0])
         self.canvas[0].draw()
 
     def _plot_imgB(self):
         # plot_img(self.imgB, self.axes[1])
-        im = self.axes[1].imshow(self.imgsB[self.curr_img_index], cmap='gray')
+        self.axes[1].cla()
+        if self.windowing.currentText() != 'uniform':
+            win = get_window(self.windowing.currentText(), self.imgsB[self.curr_img_index].shape)
+            img = win * self.imgsB[self.curr_img_index]
+        else:
+            img = self.imgsB[self.curr_img_index]
+        im = self.axes[1].imshow(normalize(img), cmap='gray')
         plt.colorbar(im, cax=self.cax[1])
         self.canvas[1].draw()
 
-    # @property
-    # def correlation(self):
-    #     if self.curr_img_index >= self.correlations.shape[0]:
-    #         self.curr_img_index = self.correlations.shape[0] - 1
-    #     return self.correlations[self.curr_img_index]
-    #
-    # @property
-    # def imgA(self):
-    #     if self.curr_img_index >= self.imgsA.shape[0]:
-    #         self.curr_img_index = self.imgsA.shape[0] - 1
-    #     return self.imgsA[self.curr_img_index]
-    #
-    # @property
-    # def imgB(self):
-    #     if self.curr_img_index >= self.imgsB.shape[0]:
-    #         self.curr_img_index = self.imgsB.shape[0] - 1
-    #     return self.imgsB[self.curr_img_index]
-
     def _plot_correlation(self):
+
         self.axes[5].cla()
         self.axes[2].cla()
-        im = self.axes[2].imshow(self.correlations[self.curr_img_index], cmap='gray')
+        im = self.axes[2].imshow(normalize(self.correlations[self.curr_img_index]), cmap='gray')
         plt.colorbar(im, cax=self.cax[2])
         self.canvas[2].draw()
-        corr = CorrelationPlane(self.correlations[self.curr_img_index])
+        corr = CorrelationPlane(data=self.correlations[self.curr_img_index],
+                                fit=self.peak_find.currentText())
         corr.data[corr.j, :].plot(ax=self.axes[5], color='r')
         corr.data[:, corr.i].plot(ax=self.axes[5], color='b')
+        ny, nx = corr.data.shape
 
-        corr.highest_peak.data[1, :].plot.scatter(ax=self.axes[5], color='r')
-        self.axes[5].scatter(corr.i, np.max(corr.highest_peak.data), color='r', marker='^')
+        peak_area = corr.data[corr.j - 1:corr.j + 2, corr.i - 1:corr.i + 2]
 
-        corr.highest_peak.data[:, 1].plot.scatter(ax=self.axes[5], color='b')
-        self.axes[5].scatter(corr.j, np.max(corr.highest_peak.data), color='b', marker='^')
+        peak_area[1, :].plot.scatter(ax=self.axes[5], color='r')
+        self.axes[5].scatter(corr.i, np.max(peak_area.data), color='r', marker='^')
+
+        peak_area[:, 1].plot.scatter(ax=self.axes[5], color='b')
+        self.axes[5].scatter(corr.j, np.max(peak_area.data), color='b', marker='^')
+
+        self.axes[5].vlines(corr.i_sub, 0, 1, color='r')
+        self.axes[5].vlines(corr.j_sub, 0, 1, color='b')
+
+        self.axes[2].vlines(corr.i_sub, 0, nx - 1, color='r')
+        self.axes[2].hlines(corr.j_sub, 0, ny - 1, color='b')
 
         self.axes[2].scatter(corr.i,
                              corr.j,
@@ -281,15 +370,15 @@ class Ui(QtWidgets.QMainWindow, Ui_MainWindow):
         ny = self.ny.value()
 
         try:
-            g1 = gauss3ptfit(corr.highest_peak.data[1, :])
-            _x = np.linspace(0, nx, 100)
+            g1 = gauss3ptfit(peak_area[1, :])
+            _x = np.linspace(0, nx, nx * 4)
             self.axes[5].plot(_x, g1(_x - corr.i), color='r', linestyle='--')
         except RuntimeError as e:
             print(e)
         try:
-            g2 = gauss3ptfit(corr.highest_peak.data[:, 1])
+            g2 = gauss3ptfit(peak_area[:, 1])
 
-            _y = np.linspace(0, ny, 100)
+            _y = np.linspace(0, ny, ny * 4)
             self.axes[5].plot(_y, g2(_y - corr.j), color='b', linestyle='--')
         except RuntimeError as e:
             print(e)
@@ -298,30 +387,39 @@ class Ui(QtWidgets.QMainWindow, Ui_MainWindow):
         self.axes[5].set_xlim(_min, _max)
         self.canvas[5].draw()
 
-        # # canvas 3: plot scatter of displacements:
+        # canvas 3: plot scatter of displacements:
         for ax in self.axes[3]:
             ax.cla()
 
         self.axes[4].cla()
 
-        estimated_dx = np.empty(shape=(self.imgsA.shape[0]))
-        estimated_dy = np.empty(shape=(self.imgsA.shape[0]))
+        estimated_dx = []  # np.empty(shape=(self.imgsA.shape[0]))
+        estimated_dy = []  # np.empty(shape=(self.imgsA.shape[0]))
         for i in range(self.imgsA.shape[0]):
-            corr = CorrelationPlane(self.correlations[i, ...])
+            try:
+                corr = CorrelationPlane(self.correlations[i, ...],
+                                        fit=self.peak_find.currentText())
+            except ValueError as e:
+                print(e)
+                continue
             # self.axes[4].scatter(corr.j + corr.highest_peak.j_sub, corr.i + corr.highest_peak.i_sub, color='k',
             #                      marker='+')
 
-            dx = corr.i + corr.highest_peak.i_sub
-            dy = corr.j + corr.highest_peak.j_sub
-            estimated_dx[i] = dx
-            estimated_dy[i] = dy
+            dx = corr.i_sub - nx / 2  # - corr.i
+            dy = corr.j_sub - ny / 2  # - corr.j
+            estimated_dx.append(dx)
+            estimated_dy.append(dy)
 
             # sub_dx = dx - round(dx)
             # sub_dy = dy - round(dy)
-
-        sub_pixel_dx = estimated_dx - nx / 2 - 1
-        sub_pixel_dy = estimated_dy - ny / 2 - 1
-        self.axes[4].scatter(sub_pixel_dx, sub_pixel_dy, color='r', marker='o', alpha=0.5)
+        estimated_dx = np.array(estimated_dx)
+        estimated_dy = np.array(estimated_dy)
+        # sub_pixel_dx = estimated_dx
+        # sub_pixel_dy = estimated_dy
+        self.axes[4].scatter(estimated_dx, estimated_dy, color='r', marker='o', alpha=0.5)
+        if len(estimated_dx) > 1:
+            self.axes[4].scatter(estimated_dx[self.curr_img_index], estimated_dy[self.curr_img_index], color='k',
+                                 marker='o')
 
         true_dx, true_dy = self.dx.value(), self.dy.value()
         self.axes[4].scatter(true_dx, true_dy, color='k', marker='+')
@@ -329,10 +427,12 @@ class Ui(QtWidgets.QMainWindow, Ui_MainWindow):
         self.axes[4].set_ylim(true_dy - 1, true_dy + 1)
 
         # compute RMS values
-        rms_x = np.sqrt(np.sum((sub_pixel_dx - true_dx) ** 2) / (max(1, len(sub_pixel_dx) - 1)))
-        rms_y = np.sqrt(np.sum((sub_pixel_dy - true_dy) ** 2) / (max(1, len(sub_pixel_dy) - 1)))
+        rms_x = np.sqrt(np.sum((estimated_dx - true_dx) ** 2) / (max(1, len(estimated_dx) - 1)))
+        rms_y = np.sqrt(np.sum((estimated_dy - true_dy) ** 2) / (max(1, len(estimated_dy) - 1)))
         rms = np.sqrt(rms_x ** 2 + rms_y ** 2)
-        self.axes[4].text(true_dx + 0.5, true_dy + 0.5, f'{rms:.3f}')
+        self.axes[4].text(true_dx + 0.25, true_dy + 0.25, f'{rms:.3f}')
+        self.axes[4].text(true_dx + 0.25, true_dy + 0.45, f'x: {rms_x:.3f}')
+        self.axes[4].text(true_dx + 0.25, true_dy + 0.65, f'y: {rms_y:.3f}')
 
         #
         # xlims = self.axes[4].get_xlim()
@@ -345,17 +445,17 @@ class Ui(QtWidgets.QMainWindow, Ui_MainWindow):
         laser_intensity = particle_intensity(z=z,
                                              beam_width=self.laser_width.value(),  # laser beam width
                                              s=self.laser_shape_factor.value(),  # shape factor
-                                             dp=None)
+                                             )
         self.axes[3][0].plot(z, laser_intensity)
         # self.axes[4][0].plot(z, laser_intensity)
 
-        self.axes[3][1].scatter(self.partA_infos[self.curr_img_index].z, self.partA_infos[self.curr_img_index].y,
+        self.axes[3][1].scatter(self.particle_dataA[self.curr_img_index].z, self.particle_dataA[self.curr_img_index].y,
                                 color='b', alpha=0.5, s=10, marker='o')
         # draw vlines for laser
         self.axes[3][1].vlines(-self.laser_width.value() / 2, 0, self.nx.value(), color='k', linestyle='--')
         self.axes[3][1].vlines(self.laser_width.value() / 2, 0, self.nx.value(), color='k', linestyle='--')
 
-        self.axes[3][1].scatter(self.partB_infos[self.curr_img_index].z, self.partB_infos[self.curr_img_index].y,
+        self.axes[3][1].scatter(self.particle_dataB[self.curr_img_index].z, self.particle_dataB[self.curr_img_index].y,
                                 color='r', alpha=0.5, s=10, marker='o')
         self.axes[3][1].vlines(-self.laser_width.value() / 2, 0, self.nx.value(), color='k', linestyle='--')
         self.axes[3][1].vlines(self.laser_width.value() / 2, 0, self.nx.value(), color='k', linestyle='--')

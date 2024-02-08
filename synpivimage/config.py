@@ -1,8 +1,6 @@
-import pathlib
 import warnings
 
 from pydantic import BaseModel
-from typing import Union
 
 
 class SynPivConfig(BaseModel):
@@ -17,13 +15,14 @@ class SynPivConfig(BaseModel):
     particle_number: int
     particle_size_mean: float
     particle_size_std: float
-    laser_width: int
+    laser_width: float
     laser_shape_factor: int = 2
     image_particle_peak_count: int = 1000
-    # laser_max_intensity: 1000
-    particle_position_file: Union[str, pathlib.Path, None] = None  # deprecated
-    particle_size_illumination_dependency: bool = False
-    square_image: bool = False
+    fill_ratio_x: float = 1.0
+    fill_ratio_y: float = 1.0
+    # pattern_meanx = 2.,  # the width of the gaussian particle (constant for image, see SIG)
+    # pattern_meany = 2.,  # the width of the gaussian particle (constant for image, see SIG)
+    particle_size_definition: str = 'e2',  # other: 'I2', '2sigma'
 
     def __getitem__(self, item):
         warnings.warn(f'Please use .{item}', DeprecationWarning)
@@ -53,8 +52,10 @@ def get_default():
         sensitivity=0.5,
         qe=0.25,
         particle_number=1,
-        particle_size_mean=2.5,
-        particle_size_std=0,
+        particle_size_mean=2.5,  # mean particle size of gaussian distribution for particle sizes
+        particle_size_std=0.1,  # sigma of gaussian distribution for particle sizes
+        pattern_meanx=2.,  # the width of the gaussian particle (constant for image, see SIG)
+        pattern_meany=2.,  # the width of the gaussian particle (constant for image, see SIG)
         laser_width=2.,
         laser_shape_factor=2,
         relative_laser_intensity=1.0

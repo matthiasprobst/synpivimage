@@ -30,19 +30,19 @@ overlap will saturate the camera. Therefore the VLI should be < 1
 Navigate to the repository folder and run
 
 ```bash
-py -m pip install .
+pip install .
 ```
 
 To use the package during development, install it accordingly:
 
 ```bash
-py -m pip install -e .
+pip install -e .
 ```
 
 To install `pytest` in order to run test optional dependencies must be installed:
 
 ```bash
-py -m pip install -e ".[test]"
+pip install -e ".[test]"
 ```
 
 Then, execute `pytest` in the repository directory:
