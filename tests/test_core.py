@@ -38,10 +38,17 @@ class TestCore(unittest.TestCase):
             z=np.random.uniform(-laser.width, laser.width, n_particles),
             size=np.ones(n_particles) * 2
         )
+        # particles = Particles(
+        #     x=8,
+        #     y=8,
+        #     z=0,
+        #     size=2
+        # )
 
         particle_peak_count = 1000
 
-        imgA = take_image(laser, cam, particles, particle_peak_count)
+        imgA = take_image(laser, cam, particles, particle_peak_count,
+                          debug_level=2)
 
         plt.figure()
         plt.imshow(imgA, cmap='gray')

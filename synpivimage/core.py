@@ -19,7 +19,8 @@ CPU_COUNT = mp.cpu_count()
 def take_image(laser: Laser,
                cam: Camera,
                particles: Particles,
-               particle_peak_count: int):
+               particle_peak_count: int,
+               **kwargs):
     """Takes an image of the particles
 
     1. Illuminates the particles (Note, that particles may lay outside the laser width! The
@@ -27,6 +28,7 @@ def take_image(laser: Laser,
     2. Captures the image
     3. Returns the image
     """
+    DEBUG_LEVEL = kwargs.get('debug_level', 0)
     # compute the particle intensity factor in order to reach particle_peak_count
     # For this, call the error function
     mean_particle_size = np.mean(particles.size)
@@ -51,11 +53,11 @@ def take_image(laser: Laser,
     threshold_noise_level = cam.dark_noise + sqrtN
 
     # illuminate the particles (max intenstiy will be one. this is only the laser intensity assigned to the particles!)
-    particles = laser.illuminate(particles, cam)
+    particles = laser.illuminate(particles, debug_level=DEBUG_LEVEL)
     # particles.intensity *= intensity_factor
     weakly_illuminated = particles.intensity * particle_peak_count < threshold_noise_level
     particles.mask = particles.mask & ~weakly_illuminated
-    particles.intensity *= intensity_factor
+    particles.intensity = np.multiply(particles.intensity, intensity_factor)
 
     n_too_weak = np.sum(weakly_illuminated)
     print(f'Particles with intensity below the noise level: {n_too_weak}')

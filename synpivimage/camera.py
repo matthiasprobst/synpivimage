@@ -1,8 +1,12 @@
 import numpy as np
+from pydantic import BaseModel
 from typing import Tuple
+from typing_extensions import Annotated
 
 from . import noise
+from .component import Component
 from .particles import Particles, model_image_particles
+from .validation import PositiveInt, PositiveFloat, ValueRange
 
 
 class ADU(np.ndarray):
@@ -13,33 +17,49 @@ class ADU(np.ndarray):
         return obj
 
 
-class Camera:
+Efficiency = Annotated[float, ValueRange(0, 1)]
+FillRatio = Annotated[float, ValueRange(0, 1)]
 
-    def __init__(self, *,
-                 nx,
-                 ny,
-                 bit_depth,
-                 qe,
-                 sensitivity,
-                 baseline_noise,
-                 dark_noise,
-                 shot_noise,
-                 fill_ratio_x: float,
-                 fill_ratio_y: float,
-                 sigmax,
-                 sigmay):
-        self.nx = nx
-        self.ny = ny
-        self.sigmax = sigmax
-        self.sigmay = sigmay
-        self.fill_ratio_x = fill_ratio_x
-        self.fill_ratio_y = fill_ratio_y
-        self.bit_depth = bit_depth
-        self.qe = qe
-        self.sensitivity = sensitivity
-        self.baseline_noise = baseline_noise
-        self.dark_noise = dark_noise
-        self.shot_noise = shot_noise
+
+class Camera(BaseModel, Component):
+    nx: PositiveInt
+    ny: PositiveInt
+    bit_depth: PositiveInt
+    qe: Efficiency
+    sensitivity: Efficiency
+    baseline_noise: float
+    dark_noise: float
+    shot_noise: float
+    fill_ratio_x: FillRatio
+    fill_ratio_y: FillRatio
+    sigmax: PositiveFloat
+    sigmay: PositiveFloat
+
+    # def __init__(self, *,
+    #              nx,
+    #              ny,
+    #              bit_depth,
+    #              qe,
+    #              sensitivity,
+    #              baseline_noise,
+    #              dark_noise,
+    #              shot_noise,
+    #              fill_ratio_x: float,
+    #              fill_ratio_y: float,
+    #              sigmax,
+    #              sigmay):
+    #     self.nx = nx
+    #     self.ny = ny
+    #     self.sigmax = sigmax
+    #     self.sigmay = sigmay
+    #     self.fill_ratio_x = fill_ratio_x
+    #     self.fill_ratio_y = fill_ratio_y
+    #     self.bit_depth = bit_depth
+    #     self.qe = qe
+    #     self.sensitivity = sensitivity
+    #     self.baseline_noise = baseline_noise
+    #     self.dark_noise = dark_noise
+    #     self.shot_noise = shot_noise
 
     def _quantize(self, electrons) -> Tuple[np.ndarray, int]:
         """Quantize the electrons to the bit depth"""

@@ -1,12 +1,13 @@
 import matplotlib.pyplot as plt
 import numpy as np
+from pydantic import BaseModel
 
 from .camera import Camera
+from .component import Component
 from .particles import Particles
+from .validation import PositiveFloat, PositiveInt
 
 SQRT2 = np.sqrt(2)
-
-DEBUG_LEVEL = 2  # 2 will plot images
 
 
 class tophat:
@@ -15,21 +16,17 @@ class tophat:
     def __init__(self, dz0):
         self.dz0 = dz0
 
-    def __call__(self, z):
-        intenstiy = np.ones_like(z)
-        intenstiy[z < -self.dz0] = 0
-        intenstiy[z > self.dz0] = 0
-        return intenstiy
+    def __call__(self, z) -> np.ndarray:
+        intensity = np.ones_like(z)
+        intensity[z < -self.dz0] = 0
+        intensity[z > self.dz0] = 0
+        return intensity
 
 
-class Laser:
+class Laser(BaseModel, Component):
     """Laser class. This class will be used to illuminate the particles"""
-
-    def __init__(self,
-                 shape_factor: int,
-                 width: float):
-        self.shape_factor = shape_factor
-        self.width = width  # width of the laser, not the effective laser width
+    shape_factor: PositiveInt
+    width: PositiveFloat  # width of the laser, not the effective laser width
 
     def get_effective_laser_width(self, cam: Camera):
         """The effective laser width is the width where a particle
@@ -41,7 +38,8 @@ class Laser:
 
     def illuminate(self,
                    particles: Particles,
-                   cam: Camera):
+                   **kwargs):
+        DEBUG_LEVEL = kwargs.get('debug_level', 0)
         dz0 = SQRT2 * self.width / 2
         s = self.shape_factor
         if s == 0:

@@ -1,8 +1,13 @@
 import pathlib
 
 from ._version import __version__
+from .camera import Camera
 from .core import take_image
+from .laser import Laser
+from .particles import Particles
 from .plotting import imshow
+
+__all__ = ['__version__', 'Camera', 'take_image', 'Laser', 'imshow', 'Particles']
 
 __package_dir__ = pathlib.Path(__file__).parent
 

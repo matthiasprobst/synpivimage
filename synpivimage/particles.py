@@ -15,12 +15,24 @@ class Particles:
                  size: np.ndarray,
                  intensity: np.ndarray = None,
                  mask: np.ndarray = None):
-        self.x = x
-        self.y = y
-        self.z = z
-        self.size = size
+        if isinstance(x, (int, float)):
+            self.x = np.array([x])
+        else:
+            self.x = x
+        if isinstance(y, (int, float)):
+            self.y = np.array([y])
+        else:
+            self.y = y
+        if isinstance(z, (int, float)):
+            self.z = np.array([z])
+        else:
+            self.z = z
+        if isinstance(size, (int, float)):
+            self.size = np.array([size])
+        else:
+            self.size = size
         if intensity is None:
-            intensity = np.zeros_like(x)
+            self.intensity = np.zeros_like(x)
         else:
             self.intensity = intensity
         if mask is None:
@@ -29,7 +41,7 @@ class Particles:
             self.mask = mask
 
     def __len__(self):
-        return len(self.x)
+        return self.x.size
 
     def __getitem__(self, item):
         return Particles(x=self.x[item],
