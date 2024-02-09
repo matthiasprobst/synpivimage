@@ -87,9 +87,9 @@ class Ui(QtWidgets.QMainWindow, Ui_MainWindow):
         self.particle_count.setMaximum(2 ** 16)
         self.particle_count.setValue(1000)
 
-        self.pattern_mean.setMinimum(0.01)
-        self.pattern_mean.setMaximum(100)
-        self.pattern_mean.setValue(1)
+        self.sigma.setMinimum(0.01)
+        self.sigma.setMaximum(100)
+        self.sigma.setValue(1)
 
         self.dx.setMinimum(-100)
         self.dx.setMaximum(100)
@@ -218,14 +218,13 @@ class Ui(QtWidgets.QMainWindow, Ui_MainWindow):
             particle_size_illumination_dependency=True,
             particle_size_mean=self.particle_size_mean.value(),
             particle_size_std=self.particle_size_std.value(),
-            # pattern_meanx=self.pattern_mean.value(),
-            # pattern_meany=self.pattern_mean.value(),
+            sigmax=self.sigma.value(),
+            sigmay=self.sigma.value(),
             fill_ratio_x=1.0,
             fill_ratio_y=1.0,
             qe=1.,
             sensitivity=1.,
             shot_noise=self.shotnoise.isChecked(),
-            particle_size_definition=self.particle_size_definition.currentText(),
         )
         return self.current_config
 
@@ -305,7 +304,7 @@ class Ui(QtWidgets.QMainWindow, Ui_MainWindow):
         self.update_plot()
 
     def update_plot(self):
-        self.pattern_mean.setValue(self.metasA[self.curr_img_index]['pattern_meanx'])
+        self.sigma.setValue(self.metasA[self.curr_img_index]['sigmax'])
         self._plot_imgA()
         self._plot_imgB()
         self._plot_correlation()

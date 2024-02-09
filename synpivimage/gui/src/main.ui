@@ -255,63 +255,34 @@
       <item row="5" column="1">
        <widget class="QDoubleSpinBox" name="particle_size_std"/>
       </item>
-      <item row="6" column="0">
-       <widget class="QLabel" name="label_19">
-        <property name="toolTip">
-         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Definition of what a image particle size is. All definitions are based on where a value of the gauss distribution is reached. &amp;quot;e2&amp;quot; is where the intensity reaches e-2. &amp;quot;I/2&amp;quot; uses half the intensity as the size definition, &amp;quot;2sigma&amp;quot; defines that the particle diameter is 2 sigma of the distribution.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-        </property>
-        <property name="text">
-         <string>psize definition</string>
-        </property>
-       </widget>
-      </item>
-      <item row="6" column="1">
-       <widget class="QComboBox" name="particle_size_definition">
-        <item>
-         <property name="text">
-          <string>e2</string>
-         </property>
-        </item>
-        <item>
-         <property name="text">
-          <string>I2</string>
-         </property>
-        </item>
-        <item>
-         <property name="text">
-          <string>2sigma</string>
-         </property>
-        </item>
-       </widget>
-      </item>
-      <item row="8" column="0">
+      <item row="7" column="0">
        <widget class="QLabel" name="label_6">
         <property name="text">
          <string>laser width</string>
         </property>
        </widget>
       </item>
-      <item row="8" column="1">
+      <item row="7" column="1">
        <widget class="QDoubleSpinBox" name="laser_width"/>
       </item>
-      <item row="9" column="0">
+      <item row="8" column="0">
        <widget class="QLabel" name="label_7">
         <property name="text">
          <string>laser shape</string>
         </property>
        </widget>
       </item>
-      <item row="9" column="1">
+      <item row="8" column="1">
        <widget class="QSpinBox" name="laser_shape_factor"/>
       </item>
-      <item row="10" column="0">
+      <item row="9" column="0">
        <widget class="QLabel" name="label_12">
         <property name="text">
          <string>peak find</string>
         </property>
        </widget>
       </item>
-      <item row="10" column="1">
+      <item row="9" column="1">
        <widget class="QComboBox" name="peak_find">
         <item>
          <property name="text">
@@ -330,40 +301,40 @@
         </item>
        </widget>
       </item>
-      <item row="11" column="0">
+      <item row="10" column="0">
        <widget class="QLabel" name="label_13">
         <property name="text">
          <string>bit depth</string>
         </property>
        </widget>
       </item>
-      <item row="11" column="1">
+      <item row="10" column="1">
        <widget class="QSpinBox" name="bit_depth"/>
       </item>
-      <item row="12" column="0">
+      <item row="11" column="0">
        <widget class="QLabel" name="label_16">
         <property name="text">
          <string>particle intenstiy</string>
         </property>
        </widget>
       </item>
-      <item row="12" column="1">
+      <item row="11" column="1">
        <widget class="QSpinBox" name="particle_count"/>
       </item>
-      <item row="7" column="1">
-       <widget class="QDoubleSpinBox" name="pattern_mean">
-        <property name="enabled">
-         <bool>false</bool>
-        </property>
-       </widget>
-      </item>
-      <item row="7" column="0">
+      <item row="4" column="0">
        <widget class="QLabel" name="label_17">
         <property name="toolTip">
          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Standard deviation of gaussian distribution used for particle image intensity.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
         </property>
         <property name="text">
          <string>pattern_mean</string>
+        </property>
+       </widget>
+      </item>
+      <item row="4" column="1">
+       <widget class="QDoubleSpinBox" name="sigma">
+        <property name="enabled">
+         <bool>true</bool>
         </property>
        </widget>
       </item>
