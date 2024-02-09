@@ -1,5 +1,6 @@
 import numpy as np
 import scipy
+from copy import deepcopy
 from typing import Tuple, Union
 
 SQRT2 = np.sqrt(2)
@@ -7,6 +8,7 @@ PARTICLE_INFLUENCE_FACTOR = 6
 
 
 class Particles:
+    """Particle class"""
 
     def __init__(self,
                  x: np.ndarray,
@@ -89,6 +91,10 @@ class Particles:
         intensity = np.zeros_like(x)  # no intensity by default
         mask = np.zeros_like(x, dtype=bool)  # disabled by default
         return cls(x, y, z, size, intensity, mask)
+
+    def copy(self):
+        """Return a copy of this object"""
+        return deepcopy(self)
 
 
 def compute_intensity_distribution(

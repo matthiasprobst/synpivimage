@@ -1,5 +1,4 @@
 import matplotlib.pyplot as plt
-import numpy as np
 import unittest
 
 from synpivimage import take_image
@@ -17,8 +16,8 @@ class TestCore(unittest.TestCase):
             bit_depth=16,
             qe=1,
             sensitivity=1,
-            baseline_noise=50,
-            dark_noise=10,
+            baseline_noise=0,
+            dark_noise=0,
             shot_noise=False,
             fill_ratio_x=1.0,
             fill_ratio_y=1.0,
@@ -31,24 +30,44 @@ class TestCore(unittest.TestCase):
             shape_factor=1002
         )
 
-        n_particles = 5
+        # distinct position (middle)
         particles = Particles(
-            x=np.random.uniform(0, cam.nx - 1, n_particles),
-            y=np.random.uniform(0, cam.ny - 1, n_particles),
-            z=np.random.uniform(-laser.width, laser.width, n_particles),
-            size=np.ones(n_particles) * 2
+            x=8,
+            y=8,
+            z=0,
+            size=2
         )
-        # particles = Particles(
-        #     x=8,
-        #     y=8,
-        #     z=0,
-        #     size=2
-        # )
 
         particle_peak_count = 1000
 
         imgA = take_image(laser, cam, particles, particle_peak_count,
                           debug_level=2)
+        self.assertEqual(imgA.max(), particle_peak_count)
+
+        from synpivimage import io
+        io.imwrite('img01a.tiff',
+                   imgA[:],
+                   cam=cam,
+                   laser=laser,
+                   overwrite=True)
+        import h5py
+        with h5py.File('img01a.hdf', 'w') as h5:
+            ds = h5.create_dataset(
+                'imgA',
+                shape=(1, *imgA.shape),
+                dtype=imgA.dtype)
+            meta_group = h5.create_group('meta')
+            laser_grp = meta_group.create_group('Laser')
+            for k, v in laser.model_dump().items():
+                laser_grp.create_dataset(k, shape=(1,))
+            cam_grp = meta_group.create_group('Camera')
+            for k, v in cam.model_dump().items():
+                cam_grp.create_dataset(k, shape=(1,))
+            io.hdfwrite(dataset=ds,
+                        index=0,
+                        img=imgA,
+                        camera=cam,
+                        laser=laser)
 
         plt.figure()
         plt.imshow(imgA, cmap='gray')
@@ -60,6 +79,14 @@ class TestCore(unittest.TestCase):
             plt.scatter(p.x, p.y, s=100, c='r', marker='x')
 
         plt.show()
+
+        # n_particles = 5
+        # particles = Particles(
+        #     x=np.random.uniform(0, cam.nx - 1, n_particles),
+        #     y=np.random.uniform(0, cam.ny - 1, n_particles),
+        #     z=np.random.uniform(-laser.width, laser.width, n_particles),
+        #     size=np.ones(n_particles) * 2
+        # )
 #
 # __this_dir__ = pathlib.Path(__file__).parent
 #

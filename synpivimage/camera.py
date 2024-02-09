@@ -8,20 +8,12 @@ from .component import Component
 from .particles import Particles, model_image_particles
 from .validation import PositiveInt, PositiveFloat, ValueRange
 
-
-class ADU(np.ndarray):
-
-    def __new__(cls, input_array, n_saturated_pixels: int):
-        obj = np.asarray(input_array).view(cls)
-        obj.n_saturated_pixels = n_saturated_pixels
-        return obj
-
-
 Efficiency = Annotated[float, ValueRange(0, 1)]
 FillRatio = Annotated[float, ValueRange(0, 1)]
 
 
 class Camera(BaseModel, Component):
+    """Camera Model"""
     nx: PositiveInt
     ny: PositiveInt
     bit_depth: PositiveInt
@@ -35,38 +27,18 @@ class Camera(BaseModel, Component):
     sigmax: PositiveFloat
     sigmay: PositiveFloat
 
-    # def __init__(self, *,
-    #              nx,
-    #              ny,
-    #              bit_depth,
-    #              qe,
-    #              sensitivity,
-    #              baseline_noise,
-    #              dark_noise,
-    #              shot_noise,
-    #              fill_ratio_x: float,
-    #              fill_ratio_y: float,
-    #              sigmax,
-    #              sigmay):
-    #     self.nx = nx
-    #     self.ny = ny
-    #     self.sigmax = sigmax
-    #     self.sigmay = sigmay
-    #     self.fill_ratio_x = fill_ratio_x
-    #     self.fill_ratio_y = fill_ratio_y
-    #     self.bit_depth = bit_depth
-    #     self.qe = qe
-    #     self.sensitivity = sensitivity
-    #     self.baseline_noise = baseline_noise
-    #     self.dark_noise = dark_noise
-    #     self.shot_noise = shot_noise
+    @property
+    def max_count(self):
+        """Max count of the sensor"""
+        return int(2 ** self.bit_depth - 1)
 
     def _quantize(self, electrons) -> Tuple[np.ndarray, int]:
         """Quantize the electrons to the bit depth"""
-        max_adu = int(2 ** self.bit_depth - 1)
+        max_adu = self.max_count
         adu = electrons * self.sensitivity
         _saturated_pixels = adu > max_adu
         n_saturated_pixels = np.sum(_saturated_pixels)
+
         adu[adu > max_adu] = max_adu  # model saturation
         if self.bit_depth == 8:
             adu = adu.astype(np.uint8)
@@ -75,16 +47,22 @@ class Camera(BaseModel, Component):
         else:
             raise ValueError(f"Bit depth {self.bit_depth} not supported")
 
-        return ADU(adu, n_saturated_pixels)
+        return np.asarray(adu), int(n_saturated_pixels)
 
     def _capture(self, irrad_photons):
         """Capture the image and add noise"""
-        electrons = noise.add_noise(irrad_photons, self.shot_noise, self.baseline_noise, self.dark_noise, self.qe)
+        electrons = noise.add_noise(irrad_photons,
+                                    self.shot_noise,
+                                    self.baseline_noise,
+                                    self.dark_noise,
+                                    self.qe)
         return electrons
 
-    def take_image(self,
-                   particles: Particles):
-        """capture and quantize the image"""
+    def take_image(self, particles: Particles) -> Tuple[np.ndarray, int]:
+        """capture and quantize the image
+
+        Returns image and number of saturated
+        """
         irrad_photons = model_image_particles(
             particles[particles.mask],
             nx=self.nx,

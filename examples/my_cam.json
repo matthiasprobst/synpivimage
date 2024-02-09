@@ -4,7 +4,7 @@
     "bit_depth": 16,
     "qe": 1.0,
     "sensitivity": 1.0,
-    "baseline_noise": 50.0,
+    "baseline_noise": 0.0,
     "dark_noise": 10.0,
     "shot_noise": 0.0,
     "fill_ratio_x": 1.0,

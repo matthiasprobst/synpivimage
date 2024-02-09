@@ -2,12 +2,23 @@ import matplotlib.pyplot as plt
 import numpy as np
 from pydantic import BaseModel
 
-from .camera import Camera
 from .component import Component
+from .log import DEFAULT_LOGGER
 from .particles import Particles
 from .validation import PositiveFloat, PositiveInt
 
 SQRT2 = np.sqrt(2)
+DEBUG_LEVEL = 0
+
+
+class real:
+
+    def __init__(self, dz0, s):
+        self.dz0 = dz0
+        self.s = s
+
+    def __call__(self, z):
+        return np.exp(-1 / np.sqrt(2 * np.pi) * np.abs(2 * z ** 2 / self.dz0 ** 2) ** self.s)
 
 
 class tophat:
@@ -23,42 +34,43 @@ class tophat:
         return intensity
 
 
+def const(z):
+    """Const laser. No sheet, illuminates all the particles."""
+    return np.ones_like(z)
+
+
 class Laser(BaseModel, Component):
     """Laser class. This class will be used to illuminate the particles"""
     shape_factor: PositiveInt
     width: PositiveFloat  # width of the laser, not the effective laser width
 
-    def get_effective_laser_width(self, cam: Camera):
-        """The effective laser width is the width where a particle
-        can be (theoretically) be distinguished from the background.
-        For this to compute, we need to know the laser properties and
-        the camera properties. The effective laser width is the width
-        where the particle intensity exceeds the noise level
-        """
-
     def illuminate(self,
                    particles: Particles,
                    **kwargs):
-        DEBUG_LEVEL = kwargs.get('debug_level', 0)
+        """Illuminate the particles. The values will be between 0 and 1.
+        Particles outside the laser will be masked"""
+        logger = kwargs.get('logger', DEFAULT_LOGGER)
+
         dz0 = SQRT2 * self.width / 2
         s = self.shape_factor
         if s == 0:
-            laser_intensity = lambda z: 1
+            laser_intensity = const
         elif s > 100:
             laser_intensity = tophat(dz0)
         else:
-            laser_intensity = lambda z: np.exp(-1 / np.sqrt(2 * np.pi) * np.abs(2 * z ** 2 / dz0 ** 2) ** s)
+            laser_intensity = real(dz0, s)
         particles.intensity = laser_intensity(particles.z)
 
         inside_laser = particles.intensity > np.exp(-2)
+
         particles.mask = inside_laser  # mask for the particles inside the laser
 
         if DEBUG_LEVEL > 0:
             n_removed = np.sum(~inside_laser)
             n_total = len(particles)
             perc_removed = n_removed / n_total * 100
-            print(f'Removed {n_removed} ({perc_removed} %) particles because they are outside the laser,'
-                  f' which is defined as an intensity below exp(-2)')
+            logger.debug(f'Removed {n_removed} ({perc_removed} %) particles because they are outside the laser,'
+                         f' which is defined as an intensity below exp(-2)')
 
         if DEBUG_LEVEL > 1:
             plt.figure()
@@ -70,20 +82,20 @@ class Laser(BaseModel, Component):
             plt.show()
         return particles
 
-    def illuminate12(self,
-                     mean_size: float,
-                     std_size: float,
-                     n_particles: int,
-                     cam: Camera):
-        """First shot. No particle input expected. The
-        particles will be generated randomly and uniformly."""
-        if std_size == 0:
-            particle_distribution_props = mean_size
-        else:
-            assert std_size > 0
-            particle_distribution_props = (mean_size, std_size)
-        particles = Particles.generate_uniform(n_particles,
-                                               particle_distribution_props,
-                                               cam.x_bounds,
-                                               cam.y_bounds,
-                                               cam.z_bounds)
+    # def illuminate12(self,
+    #                  mean_size: float,
+    #                  std_size: float,
+    #                  n_particles: int,
+    #                  cam: Camera):
+    #     """First shot. No particle input expected. The
+    #     particles will be generated randomly and uniformly."""
+    #     if std_size == 0:
+    #         particle_distribution_props = mean_size
+    #     else:
+    #         assert std_size > 0
+    #         particle_distribution_props = (mean_size, std_size)
+    #     particles = Particles.generate_uniform(n_particles,
+    #                                            particle_distribution_props,
+    #                                            cam.x_bounds,
+    #                                            cam.y_bounds,
+    #                                            cam.z_bounds)
