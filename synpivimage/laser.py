@@ -1,11 +1,13 @@
+import logging
 import matplotlib.pyplot as plt
 import numpy as np
 from pydantic import BaseModel
 
 from .component import Component
-from .log import DEFAULT_LOGGER
 from .particles import Particles
 from .validation import PositiveFloat, PositiveInt
+
+LOGGER = logging.getLogger('synpivimage')
 
 SQRT2 = np.sqrt(2)
 DEBUG_LEVEL = 0
@@ -49,7 +51,7 @@ class Laser(BaseModel, Component):
                    **kwargs):
         """Illuminate the particles. The values will be between 0 and 1.
         Particles outside the laser will be masked"""
-        logger = kwargs.get('logger', DEFAULT_LOGGER)
+        logger = kwargs.get('logger', LOGGER)
 
         dz0 = SQRT2 * self.width / 2
         s = self.shape_factor

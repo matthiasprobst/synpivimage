@@ -1,16 +1,25 @@
+import logging
 import matplotlib.pyplot as plt
+import numpy as np
+import pathlib
 import unittest
 
 from synpivimage import take_image
 from synpivimage.camera import Camera
 from synpivimage.laser import Laser
-from synpivimage.particles import Particles
+from synpivimage.particles import Particles, ParticleFlag
+
+__this_dir__ = pathlib.Path(__file__).parent
+logger = logging.getLogger('synpivimage')
+logger.setLevel('DEBUG')
+for h in logger.handlers:
+    h.setLevel('DEBUG')
 
 
 class TestCore(unittest.TestCase):
 
-    def test_take_image(self):
-        cam = Camera(
+    def setUp(self) -> None:
+        self.cam = Camera(
             nx=16,
             ny=16,
             bit_depth=16,
@@ -21,14 +30,50 @@ class TestCore(unittest.TestCase):
             shot_noise=False,
             fill_ratio_x=1.0,
             fill_ratio_y=1.0,
-            sigmax=1,
-            sigmay=1,
+            particle_image_diameter=2)
+        self.laser = Laser(
+            width=0.25,
+            shape_factor=1000
         )
 
-        laser = Laser(
-            width=0.25,
-            shape_factor=1002
+    def tearDown(self) -> None:
+        """delete created files"""
+        for suffix in ('.hdf', '.tif', '.json'):
+            filenames = __this_dir__.glob(f'*{suffix}')
+            for hdf_filename in filenames:
+                hdf_filename.unlink()
+
+    def test_source_density(self):
+        """
+        Source density:
+        Ns = C*...
+
+        """
+
+    def test_out_of_plane(self):
+        imgA, partA = take_image(self.laser, self.cam,
+                                 Particles(x=8, y=8, z=0, size=2),
+                                 1000)
+        self.assertEqual(partA.active.sum(), 1)
+        self.assertEqual(partA.n_out_of_plane_loss, 0)
+        self.assertEqual(partA.in_fov.sum(), 1)
+
+        imgB, partB = take_image(self.laser, self.cam,
+                                 partA.displace(dz=10), 1000)
+        self.assertEqual(partA.active.sum(), 1)
+        self.assertEqual(partB.n_out_of_plane_loss, 1)
+        self.assertEqual(partB.in_fov.sum(), 1)
+
+    def test_take_image(self):
+        # place particles outside laser sheet
+        particles = Particles(
+            x=8,
+            y=8,
+            z=-100,
+            size=2
         )
+        imgA, particlesA = take_image(self.laser, self.cam, particles, 1000)
+        self.assertEqual(0, np.asarray(particlesA.flag & ParticleFlag.ILLUMINATED.value, dtype=bool).sum())
 
         # distinct position (middle)
         particles = Particles(
@@ -40,9 +85,10 @@ class TestCore(unittest.TestCase):
 
         particle_peak_count = 1000
 
-        imgA = take_image(laser, cam, particles, particle_peak_count,
-                          debug_level=2)
+        imgA, particlesA = take_image(self.laser, self.cam, particles, particle_peak_count,
+                                      debug_level=2)
         self.assertEqual(imgA.max(), particle_peak_count)
+        self.assertEqual(1, np.asarray(particlesA.flag & ParticleFlag.ILLUMINATED.value, dtype=bool).sum())
 
         from synpivimage import io
         io.imwrite('img01a.tiff',
@@ -58,24 +104,24 @@ class TestCore(unittest.TestCase):
                 dtype=imgA.dtype)
             meta_group = h5.create_group('meta')
             laser_grp = meta_group.create_group('Laser')
-            for k, v in laser.model_dump().items():
+            for k, v in self.laser.model_dump().items():
                 laser_grp.create_dataset(k, shape=(1,))
             cam_grp = meta_group.create_group('Camera')
-            for k, v in cam.model_dump().items():
+            for k, v in self.cam.model_dump().items():
                 cam_grp.create_dataset(k, shape=(1,))
             io.hdfwrite(dataset=ds,
                         index=0,
                         img=imgA,
-                        camera=cam,
-                        laser=laser)
+                        camera=self.cam,
+                        laser=self.laser)
 
         plt.figure()
         plt.imshow(imgA, cmap='gray')
         plt.colorbar()
-        for p in particles[particles.mask]:
+        for p in particles[particles.active]:
             plt.scatter(p.x, p.y, s=100, c='g', marker='x')
 
-        for p in particles[~particles.mask]:
+        for p in particles[~particles.active]:
             plt.scatter(p.x, p.y, s=100, c='r', marker='x')
 
         plt.show()
@@ -88,19 +134,11 @@ class TestCore(unittest.TestCase):
         #     size=np.ones(n_particles) * 2
         # )
 #
-# __this_dir__ = pathlib.Path(__file__).parent
-#
 #
 # class TestCore(unittest.TestCase):
 #
 #     def setUp(self) -> None:
 #         """setup"""
-#         hdf_filenames = __this_dir__.glob('ds*.hdf')
-#         for hdf_filename in hdf_filenames:
-#             hdf_filename.unlink(missing_ok=True)
-#
-#     def tearDown(self) -> None:
-#         """delete created files"""
 #         hdf_filenames = __this_dir__.glob('ds*.hdf')
 #         for hdf_filename in hdf_filenames:
 #             hdf_filename.unlink(missing_ok=True)

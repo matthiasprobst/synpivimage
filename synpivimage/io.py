@@ -3,11 +3,12 @@ import h5py
 import json
 import numpy as np
 import pathlib
-from typing import Dict, Union
+from typing import Dict, Union, List
 
+from . import get_software_source_code_meta
 from .camera import Camera
-from .component import Component
 from .laser import Laser
+from .particles import Particles
 
 
 def parse_filename(filename: Union[str, pathlib.Path],
@@ -27,34 +28,59 @@ def build_meta_dict(**kwargs) -> dict:
     meta = {}
 
     for k, v in kwargs.items():
-        if isinstance(v, Component):
-            meta[k] = v.model_dump()
-        else:
-            meta[k] = v
+        if v is not None:
+            if hasattr(v, 'model_dump'):
+                meta[k] = v.model_dump()
+            else:
+                meta[k] = v
+    meta['software_info'] = get_software_source_code_meta()
     return meta
 
 
-def hdfwrite(dataset: h5py.Dataset,
-             index: int,
-             img: np.ndarray,
+def hdfwrite(group: h5py.Group,
+             img: Union[np.ndarray, List[np.ndarray]],
              camera: Camera,
              laser: Laser,
-             meta_group: Union[h5py.Group, str] = 'meta') -> None:
-    """Write to open HDF5 file. The target dataset must have been
-    prepared correctly!"""
-    dataset[index, ...] = img[:]
-    if isinstance(meta_group, str):
-        meta_group = dataset.parent[meta_group]
-    for component in (camera, laser):
+             particles: Union[Particles, List[Particles]],
+             img_dataset_name='img'):
+    """Write to open HDF5 file"""
+    group.attrs['software_info'] = json.dumps(get_software_source_code_meta())
+    if isinstance(img, (list, tuple)):
+        assert isinstance(particles, (list, tuple)), "particles must be a list or tuple if img is a list or tuple"
+        assert len(img) == len(particles), "img and particles must have the same length"
+        n_imgs = len(img)
+        img_shape = img[0].shape
+        imgs = [np.asarray(i) for i in img]
+    else:
+        n_imgs = 1
+        img_shape = img.shape
+        imgs = [np.asarray(img)]
+    imgds = group.create_dataset(img_dataset_name, shape=(n_imgs, *img_shape))
+    for i, im in enumerate(imgs):
+        imgds[i, ...] = im
+    metadata = group.create_group('virtual_piv_setup')
+
+    def _write_component(_component, _group):
+        for k, v in _component.model_dump().items():
+            _group.create_dataset(k, data=v)
+
+    for component in (camera, laser, particles):
         if component:
-            comp_grp = meta_group[component.__class__.__name__]
-            for k, v in component.model_dump().items():
-                comp_grp[k][index] = v
+            if isinstance(component, (list, tuple)):
+                for ic, c in enumerate(component):
+                    comp_grp = metadata.create_group(c.__class__.__name__ + f'_{ic}')
+                    _write_component(c, comp_grp)
+            else:
+                comp_grp = metadata.create_group(component.__class__.__name__)
+                _write_component(component, comp_grp)
 
 
 def imwrite(filename: Union[str, pathlib.Path],
             img: np.ndarray,
             overwrite: bool = False,
+            camera: Camera = None,
+            laser: Laser = None,
+            particles: Particles = None,
             **kwargs) -> pathlib.Path:
     """Write an image to a file. Calls cv2.imwrite!
 
@@ -79,24 +105,36 @@ def imwrite(filename: Union[str, pathlib.Path],
     """
     plib_filename = parse_filename(filename, overwrite)
     cv2.imwrite(str(filename), img)
-    if len(kwargs) > 0:
-        meta = build_meta_dict(**kwargs)
 
-        with open(plib_filename.with_suffix('.json'), 'w') as f:
-            json.dump(meta, f, indent=4)
+    metadata = {'camera': camera, 'laser': laser, 'particles': particles}
+    metadata.update(kwargs)
+    metawrite(plib_filename.with_suffix('.json'), metadata)
 
     return plib_filename
+
+
+def metawrite(filename: Union[str, pathlib.Path],
+              metadata: Dict) -> None:
+    filename = pathlib.Path(filename)
+    meta = build_meta_dict(**metadata)
+    with open(filename.with_suffix('.json'), 'w') as f:
+        json.dump(meta, f, indent=4)
 
 
 def imwrite16(filename,
               img,
               overwrite: bool = False,
-              meta: Dict = None, **kwargs):
+              camera: Camera = None,
+              laser: Laser = None,
+              particles: Particles = None,
+              **kwargs):
     """Write an image to a 16 bit file"""
     return imwrite(filename,
                    img.astype(np.uint16),
                    overwrite,
-                   meta=meta,
+                   camera=camera,
+                   laser=laser,
+                   particles=particles,
                    **kwargs)
 
 
@@ -155,10 +193,9 @@ def metaread(filename) -> Dict:
     with open(meta_filename, 'r') as f:
         return json.load(f)
 
-
-def metawrite(filename, meta: Dict):
-    """Write metadata to a json file"""
-    filename = pathlib.Path(filename)
-    meta_filename = filename.with_suffix('.json')
-    with open(meta_filename, 'w') as f:
-        json.dump(meta, f, indent=4)
+# def metawrite(filename: Union[str, pathlib.Path], metadata: Dict):
+#     """Write metadata to a json file"""
+#     filename = pathlib.Path(filename)
+#     meta_filename = filename.with_suffix('.json')
+#     with open(meta_filename, 'w') as f:
+#         json.dump(metadata, f, indent=4)

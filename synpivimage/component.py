@@ -14,6 +14,14 @@ class Component(abc.ABC):
             json.dump(self.model_dump(), f, indent=4)
         return filename
 
+    @classmethod
+    def load(cls, filename: Union[str, pathlib.Path]):
+        """Load the component from JSON"""
+        filename = pathlib.Path(filename).with_suffix('.json')
+        with open(filename) as f:
+            data = json.load(f)
+        return cls(**data)
+
 
 def save_multiple(components: List[Component],
                   filename: Union[str, pathlib.Path]):

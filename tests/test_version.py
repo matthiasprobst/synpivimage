@@ -1,3 +1,4 @@
+import json
 import pathlib
 import unittest
 
@@ -17,3 +18,10 @@ class TestVersion(unittest.TestCase):
                 if 'version' in line:
                     this_version = line.split(' = ')[-1].strip()
         self.assertEqual(synpivimage.__version__, this_version)
+
+    def test_codemeta(self):
+        """checking if the version in codemeta.json is the same as the one of the toolbox"""
+
+        codemeta = synpivimage.get_software_source_code_meta()
+
+        self.assertEqual(codemeta['version'], synpivimage.__version__)

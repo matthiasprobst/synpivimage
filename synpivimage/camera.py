@@ -24,8 +24,15 @@ class Camera(BaseModel, Component):
     shot_noise: float
     fill_ratio_x: FillRatio
     fill_ratio_y: FillRatio
-    sigmax: PositiveFloat
-    sigmay: PositiveFloat
+    particle_image_diameter: PositiveFloat
+
+    # sigmax: PositiveFloat
+    # sigmay: PositiveFloat
+
+    @property
+    def size(self) -> int:
+        """Size of the sensor in pixels"""
+        return int(self.nx * self.ny)
 
     @property
     def max_count(self):
@@ -59,16 +66,21 @@ class Camera(BaseModel, Component):
         return electrons
 
     def take_image(self, particles: Particles) -> Tuple[np.ndarray, int]:
-        """capture and quantize the image
+        """capture and quantize the image.
 
-        Returns image and number of saturated
+        .. note::
+            The definition of the image particle diameter is the diameter of the
+            particle image in pixels, where the normalized gaussian is equal to $e^{-2}$,
+            which is a full width of $4 \sigma$.
+
+        Returns image and number of saturated pixels.
         """
         irrad_photons = model_image_particles(
-            particles[particles.mask],
+            particles[particles.active],
             nx=self.nx,
             ny=self.ny,
-            sigmax=self.sigmax,
-            sigmay=self.sigmay,
+            sigmax=self.particle_image_diameter / 4,
+            sigmay=self.particle_image_diameter / 4,
             fill_ratio_x=self.fill_ratio_x,
             fill_ratio_y=self.fill_ratio_y
         )

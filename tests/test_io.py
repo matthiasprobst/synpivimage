@@ -17,6 +17,35 @@ class TestIO(unittest.TestCase):
         for filename in self.filenames:
             pathlib.Path(filename).unlink(missing_ok=True)
 
+    def test_write_particle_data(self):
+        from synpivimage.io import metawrite
+        from synpivimage.particles import Particles
+        from synpivimage.camera import Camera
+        cam = Camera(
+            nx=16,
+            ny=16,
+            bit_depth=16,
+            qe=1,
+            sensitivity=1,
+            baseline_noise=50,
+            dark_noise=10,
+            shot_noise=False,
+            fill_ratio_x=1.0,
+            fill_ratio_y=1.0,
+            sigmax=1,
+            sigmay=1,
+        )
+
+        n = 40
+        particles = Particles(
+            x=np.random.uniform(-5, cam.nx - 1, n),
+            y=np.random.uniform(-10, cam.ny - 1, n),
+            z=np.random.uniform(-1, 1, n),
+            size=2
+        )
+
+        metawrite(filename='particles.json', metadata=dict(particles=particles))
+
     def test_imwrite_imread_16(self):
         im16 = np.random.randint(0, 2 ** 16 - 1, (16, 16), dtype=np.uint16)
         filename = io.imwrite(__this_dir__ / 'im16.tiff',

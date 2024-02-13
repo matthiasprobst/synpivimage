@@ -13,3 +13,21 @@ def imshow(img, ax=None, **kwargs):
     cb = plt.colorbar(im, cax=cax)
 
     return ax, cax, cb
+
+
+def imshow2(img1, img2, axs=None, **kwargs):
+    """Plots two images side by side with colorbars."""
+    if axs is None:
+        fig, axs = plt.subplots(1, 2, tight_layout=True)
+    caxs = []
+    cbs = []
+
+    ax, cax, cb = imshow(img1, ax=axs[0], **kwargs)
+    caxs.append(cax)
+    cbs.append(cb)
+
+    ax, cax, cb = imshow(img2, ax=axs[1], **kwargs)
+    caxs.append(cax)
+    cbs.append(cb)
+
+    return axs, caxs, cbs
