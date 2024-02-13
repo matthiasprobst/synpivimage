@@ -85,35 +85,23 @@ class TestCore(unittest.TestCase):
 
         particle_peak_count = 1000
 
-        imgA, particlesA = take_image(self.laser, self.cam, particles, particle_peak_count,
-                                      debug_level=2)
+        imgA, particlesA = take_image(self.laser, self.cam, particles, particle_peak_count)
         self.assertEqual(imgA.max(), particle_peak_count)
         self.assertEqual(1, np.asarray(particlesA.flag & ParticleFlag.ILLUMINATED.value, dtype=bool).sum())
 
         from synpivimage import io
         io.imwrite('img01a.tiff',
                    imgA[:],
-                   cam=cam,
-                   laser=laser,
+                   cam=self.cam,
+                   laser=self.laser,
                    overwrite=True)
         import h5py
         with h5py.File('img01a.hdf', 'w') as h5:
-            ds = h5.create_dataset(
-                'imgA',
-                shape=(1, *imgA.shape),
-                dtype=imgA.dtype)
-            meta_group = h5.create_group('meta')
-            laser_grp = meta_group.create_group('Laser')
-            for k, v in self.laser.model_dump().items():
-                laser_grp.create_dataset(k, shape=(1,))
-            cam_grp = meta_group.create_group('Camera')
-            for k, v in self.cam.model_dump().items():
-                cam_grp.create_dataset(k, shape=(1,))
-            io.hdfwrite(dataset=ds,
-                        index=0,
+            io.hdfwrite(group=h5,
                         img=imgA,
                         camera=self.cam,
-                        laser=self.laser)
+                        laser=self.laser,
+                        particles=particlesA)
 
         plt.figure()
         plt.imshow(imgA, cmap='gray')
