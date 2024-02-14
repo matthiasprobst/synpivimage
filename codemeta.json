@@ -3,7 +3,7 @@
   "@type": "SoftwareSourceCode",
   "license": "https://spdx.org/licenses/MIT",
   "codeRepository": "git+https://github.com/MatthiasProbst/synpivimage",
-  "name": "h5RDMtoolbox",
+  "name": "synpivimage",
   "version": "1.0.0",
   "description": "Tool to build synthetic Particle Image Velocimetry (PIV) images",
   "applicationCategory": "Engineering",

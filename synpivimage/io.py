@@ -3,9 +3,10 @@ import h5py
 import json
 import numpy as np
 import pathlib
+import warnings
 from typing import Dict, Union, List
 
-from . import get_software_source_code_meta
+from . import get_package_meta
 from .camera import Camera
 from .laser import Laser
 from .particles import Particles
@@ -33,7 +34,7 @@ def build_meta_dict(**kwargs) -> dict:
                 meta[k] = v.model_dump()
             else:
                 meta[k] = v
-    meta['software_info'] = get_software_source_code_meta()
+    meta['software_info'] = get_package_meta()
     return meta
 
 
@@ -42,9 +43,45 @@ def hdfwrite(group: h5py.Group,
              camera: Camera,
              laser: Laser,
              particles: Union[Particles, List[Particles]],
-             img_dataset_name='img'):
+             img_dataset_name='img',
+             bit_depth=16):
+    warnings.warn("hdfwrite is deprecated, use hdfwrite16 or hdfwrite8 instead", DeprecationWarning)
+    return _hdfwrite(group, img, camera, laser, particles, img_dataset_name=img_dataset_name, bit_depth=bit_depth)
+
+
+def hdfwrite16(group: h5py.Group,
+               img: Union[np.ndarray, List[np.ndarray]],
+               camera: Camera,
+               laser: Laser,
+               particles: Union[Particles, List[Particles]],
+               img_dataset_name='img'):
+    return _hdfwrite(group, img, camera, laser, particles, img_dataset_name=img_dataset_name, bit_depth=16)
+
+
+def hdfwrite8(group: h5py.Group,
+              img: Union[np.ndarray, List[np.ndarray]],
+              camera: Camera,
+              laser: Laser,
+              particles: Union[Particles, List[Particles]],
+              img_dataset_name='img'):
+    return _hdfwrite(group, img, camera, laser, particles, img_dataset_name=img_dataset_name, bit_depth=8)
+
+
+def _hdfwrite(group: h5py.Group,
+              img: Union[np.ndarray, List[np.ndarray]],
+              camera: Camera,
+              laser: Laser,
+              particles: Union[Particles, List[Particles]],
+              img_dataset_name,
+              bit_depth):
     """Write to open HDF5 file"""
-    group.attrs['software_info'] = json.dumps(get_software_source_code_meta())
+    if bit_depth == 8:
+        _dtype = 'uint8'
+    elif bit_depth == 16:
+        _dtype = 'uint16'
+    else:
+        raise ValueError("bit_depth must be 8 or 16")
+    group.attrs['software_info'] = json.dumps(get_package_meta())
     if isinstance(img, (list, tuple)):
         assert isinstance(particles, (list, tuple)), "particles must be a list or tuple if img is a list or tuple"
         assert len(img) == len(particles), "img and particles must have the same length"
@@ -55,7 +92,8 @@ def hdfwrite(group: h5py.Group,
         n_imgs = 1
         img_shape = img.shape
         imgs = [np.asarray(img)]
-    imgds = group.create_dataset(img_dataset_name, shape=(n_imgs, *img_shape))
+        particles = [particles, ]
+    imgds = group.create_dataset(img_dataset_name, shape=(n_imgs, *img_shape), dtype=_dtype)
     for i, im in enumerate(imgs):
         imgds[i, ...] = im
     metadata = group.create_group('virtual_piv_setup')
@@ -64,7 +102,23 @@ def hdfwrite(group: h5py.Group,
         for k, v in _component.model_dump().items():
             _group.create_dataset(k, data=v)
 
-    for component in (camera, laser, particles):
+    ref_len = particles[0].x.size
+    equal_length_particles = all(ref_len == p.x.size for p in particles)
+    if equal_length_particles:
+        laser_grp = metadata.create_group(particles[0].__class__.__name__)
+
+        for ic, (k, v) in enumerate(particles[0].model_dump().items()):
+            ds = laser_grp.create_dataset(k, shape=(n_imgs, ref_len))
+            ds[0, :] = v
+
+        for i, p in enumerate(particles):
+            for ic, (k, v) in enumerate(p.model_dump().items()):
+                laser_grp[k][i, :] = v
+
+        iterator = (camera, laser,)
+    else:
+        iterator = (camera, laser, particles[0])
+    for component in iterator:
         if component:
             if isinstance(component, (list, tuple)):
                 for ic, c in enumerate(component):

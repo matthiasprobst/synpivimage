@@ -13,12 +13,12 @@ __this_dir__ = pathlib.Path(__file__).parent
 
 logging.basicConfig()
 logger = logging.getLogger(__package__)
-sh = logging.StreamHandler()
-sh.setLevel(logging.INFO)
-logger.addHandler(sh)
+_sh = logging.StreamHandler()
+_sh.setLevel(logging.INFO)
+logger.addHandler(_sh)
 
 
-def get_software_source_code_meta():
+def get_package_meta():
     """Reads codemeta.json and returns it as dict"""
     with open(__this_dir__ / '../codemeta.json', 'r') as f:
         codemeta = json.loads(f.read())

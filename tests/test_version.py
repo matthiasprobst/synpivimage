@@ -22,6 +22,6 @@ class TestVersion(unittest.TestCase):
     def test_codemeta(self):
         """checking if the version in codemeta.json is the same as the one of the toolbox"""
 
-        codemeta = synpivimage.get_software_source_code_meta()
+        codemeta = synpivimage.get_package_meta()
 
         self.assertEqual(codemeta['version'], synpivimage.__version__)
