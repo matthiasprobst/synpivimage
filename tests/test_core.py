@@ -16,6 +16,95 @@ for h in logger.handlers:
     h.setLevel('DEBUG')
 
 
+class TestLaser(unittest.TestCase):
+
+    def test_effective_laser_width(self):
+        """Test the effective laser width"""
+        laser = Laser(
+            width=0.25,
+            shape_factor=2
+        )
+        cam = Camera(
+            nx=16,
+            ny=16,
+            bit_depth=16,
+            qe=1,
+            sensitivity=1,
+            baseline_noise=200,
+            dark_noise=100,
+            shot_noise=False,
+            fill_ratio_x=1.0,
+            fill_ratio_y=1.0,
+            particle_image_diameter=1.0
+        )
+        n = 400
+        many_particles = Particles(
+            x=np.ones(n) * cam.nx // 2,
+            y=np.ones(n) * cam.ny // 2,
+            z=np.linspace(-3 * laser.width / 2, 3 * laser.width / 2, n),
+            size=np.ones(n) * 2
+        )
+        imgOne, partOne = take_image(laser, cam, many_particles, particle_peak_count=1000)
+
+
+class TestParticles(unittest.TestCase):
+    def test_single_particle(self):
+        one_particle = Particles(
+            x=1,
+            y=1,
+            z=1,
+            size=1,
+        )
+        self.assertEqual(len(one_particle), 1)
+        self.assertEqual(one_particle.x, np.array([1, ]))
+
+        one_particle = Particles(
+            x=[1, ],
+            y=[1, ],
+            z=[1, ],
+            size=[1, ]
+        )
+        self.assertEqual(len(one_particle), 1)
+        self.assertEqual(one_particle.x, np.array([1, ]))
+        with self.assertRaises(AttributeError):
+            one_particle.x = 3.
+
+        with self.assertRaises(AttributeError):
+            one_particle[0].x = 3.
+
+        self.assertEqual(one_particle[0].x, np.array([1, ]))
+
+        with self.assertRaises(ValueError):
+            one_particle = Particles(
+                x=np.array([1, ]),
+                y=np.array([1, 2, 3]),
+                z=np.array([1, ]),
+                size=np.array([1, ])
+            )
+
+    def test_init_particles(self):
+        cam = Camera(
+            nx=16,
+            ny=16,
+            bit_depth=16,
+            qe=1,
+            sensitivity=1,
+            baseline_noise=0,
+            dark_noise=0,
+            shot_noise=False,
+            fill_ratio_x=1.0,
+            fill_ratio_y=1.0,
+            particle_image_diameter=2
+        )
+        n = 10
+        many_particles = Particles(
+            x=np.ones(n) * cam.nx // 2,
+            y=np.ones(n) * cam.ny // 2,
+            z=np.linspace(-3, 3, n),
+            size=np.ones(n) * 2
+        )
+
+
 class TestCore(unittest.TestCase):
 
     def setUp(self) -> None:
@@ -49,6 +138,19 @@ class TestCore(unittest.TestCase):
         Ns = C*...
 
         """
+
+    def test_max_particle_count(self):
+        """If the user specifies particle_peak_count=1000, then a single particle in
+        the center of the light sheet should have the max count of 1000"""
+
+        assert self.cam.dark_noise == 0
+        assert not self.cam.shot_noise
+
+        imgA, partA = take_image(self.laser, self.cam,
+                                 Particles(x=8, y=8, z=0, size=2),
+                                 1000)
+        self.assertAlmostEqual(imgA.max(), 1000, delta=1)
+        self.assertAlmostEqual(partA.max_image_photons.max(), 1000, delta=1)
 
     def test_out_of_plane(self):
         imgA, partA = take_image(self.laser, self.cam,
@@ -86,7 +188,7 @@ class TestCore(unittest.TestCase):
         particle_peak_count = 1000
 
         imgA, particlesA = take_image(self.laser, self.cam, particles, particle_peak_count)
-        self.assertEqual(imgA.max(), particle_peak_count)
+        self.assertAlmostEqual(imgA.max(), particle_peak_count, delta=1)
         self.assertEqual(1, np.asarray(particlesA.flag & ParticleFlag.ILLUMINATED.value, dtype=bool).sum())
 
         from synpivimage import io

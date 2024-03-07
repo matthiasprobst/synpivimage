@@ -3,7 +3,7 @@ import numpy as np
 import scipy
 from copy import deepcopy
 from dataclasses import dataclass
-from typing import Tuple, Union, Dict
+from typing import Tuple, Union, Dict, Optional, List
 
 SQRT2 = np.sqrt(2)
 PARTICLE_INFLUENCE_FACTOR = 6
@@ -47,58 +47,165 @@ class Particles:
     """
 
     def __init__(self,
-                 x: np.ndarray,
-                 y: np.ndarray,
-                 z: np.ndarray,
-                 size: np.ndarray,
-                 intensity: np.ndarray = None,
-                 flag: np.ndarray = None):
-        if isinstance(x, (int, float)):
-            self.x = np.array([x])
-        else:
-            self.x = x
+                 *,
+                 x: Union[float, List[float], np.ndarray],
+                 y: Union[float, List[float], np.ndarray],
+                 z: Union[float, List[float], np.ndarray],
+                 size: Union[float, List[float], np.ndarray],
+                 source_intensity: Optional[Union[float, List[float], np.ndarray]] = None,
+                 max_image_photons: Optional[Union[float, List[float], np.ndarray]] = None,
+                 image_electrons: Optional[Union[float, List[float], np.ndarray]] = None,
+                 image_quantized_electrons: Optional[Union[float, List[float], np.ndarray]] = None,
+                 flag: Union[int, List[int], np.ndarray] = None):
+        """
+        Parameters
+        ----------
+        x : np.ndarray
+            x-coordinate of the particles on the sensor in pixels
+        y : np.ndarray
+            y-coordinate of the particles on the sensor in pixels
+        z : np.ndarray
+            z-coordinate of the particles on the sensor in arbitrary units
+        size : np.ndarray
+            Particle size in pixels
+        source_intensity : np.ndarray
+            Source intensity of the particles, which is the intensity it emits as a point source.
+            The peak intensity on the sensor may be higher. see property `irrad_photons`
+        max_image_photons : np.ndarray
+            Maximum number of photons on the sensor
+        image_electrons : np.ndarray
+            Number of electrons on the sensor
+        image_quantized_electrons : np.ndarray
+            Number of quantized electrons on the sensor
+        """
 
-        if isinstance(y, (int, float)):
-            self.y = np.array([y])
-        else:
-            self.y = y
+        def _parse_array(_arr, _n: int, dtype=None):
+            if _arr is None:
+                _arr = np.zeros(shape=(_n,), dtype=dtype)
+            if isinstance(_arr, (tuple, list)):
+                _arr = np.asarray(_arr)
+            elif isinstance(_arr, (float, int)):
+                _arr = np.array([_arr, ])
+            else:
+                if not isinstance(_arr, np.ndarray):
+                    raise TypeError(f"Expected array, got {type(_arr)}")
+            if not _arr.ndim == 1:
+                raise ValueError(f"Expected 1D array, got {_arr.ndim}D")
+            if _n is None:
+                return _arr
+            if _arr.size != _n:
+                raise ValueError(f"Expected array of size {_n}, got {_arr.size}")
+            return _arr
 
-        if isinstance(z, (int, float)):
-            self.z = np.array([z])
-        else:
-            self.z = z
+        if x is None:
+            raise ValueError("x cannot be None")
+        self._x = _parse_array(x, None)
+        N = self._x.size
+        self._y = _parse_array(y, N)
+        self._z = _parse_array(z, N)
+        self._size = _parse_array(size, N)
+        self._source_intensity = _parse_array(source_intensity, N)
+        self._max_image_photons = _parse_array(max_image_photons, N)
+        self._image_electrons = _parse_array(image_electrons, N)
+        self._image_quantized_electrons = _parse_array(image_quantized_electrons, N)
+        self._flag = _parse_array(flag, N, dtype=int)
 
-        if isinstance(size, (int, float)):
-            self.size = np.ones_like(self.x) * size
-        else:
-            self.size = size
+    @property
+    def x(self):
+        """x-coordinate of the particles on the sensor in pixels"""
+        return self._x
 
-        if intensity is None:
-            self.intensity = np.zeros_like(self.x)
-        else:
-            self.intensity = intensity
+    @property
+    def y(self):
+        """y-coordinate of the particles on the sensor in pixels"""
+        return self._y
 
-        if flag is None:
-            self.flag = np.zeros_like(self.x, dtype=int)
-        else:
-            self.flag = flag
+    @property
+    def z(self):
+        """z-coordinate of the particles on the sensor in arbitrary units"""
+        return self._z
 
-        assert self.x.size == self.y.size == self.z.size == self.size.size == self.intensity.size == self.flag.size
+    @property
+    def size(self):
+        """Particle size in pixels"""
+        return self._size
+
+    @property
+    def source_intensity(self):
+        """Source intensity of the particles, which is the intensity it emits as a point source.
+        The peak intensity on the sensor may be higher. see property `irrad_photons`"""
+        return self._source_intensity
+
+    @source_intensity.setter
+    def source_intensity(self, value):
+        assert value.ndim == 1, f"Expected 1D array, got {value.ndim}D"
+        assert value.size == self.n_particles, f"Expected array of size {self.n_particles}, got {value.size}"
+        self._source_intensity = value
+
+    @property
+    def max_image_photons(self):
+        """Maximum number of photons on the sensor"""
+        return self._max_image_photons
+
+    @max_image_photons.setter
+    def max_image_photons(self, value):
+        assert value.ndim == 1, f"Expected 1D array, got {value.ndim}D"
+        assert value.size == self.n_particles, f"Expected array of size {self.n_particles}, got {value.size}"
+        self.max_image_photons = value
+
+    @property
+    def image_electrons(self):
+        """Number of electrons on the sensor"""
+        return self._image_electrons
+
+    @image_electrons.setter
+    def image_electrons(self, value):
+        assert value.ndim == 1, f"Expected 1D array, got {value.ndim}D"
+        assert value.size == self.n_particles, f"Expected array of size {self.n_particles}, got {value.size}"
+        self.image_electrons = value
+
+    @property
+    def image_quantized_electrons(self):
+        """Number of quantized electrons on the sensor"""
+        return self._image_quantized_electrons
+
+    @image_quantized_electrons.setter
+    def image_quantized_electrons(self, value):
+        assert value.ndim == 1, f"Expected 1D array, got {value.ndim}D"
+        assert value.size == self.n_particles, f"Expected array of size {self.n_particles}, got {value.size}"
+        self.image_quantized_electrons = value
+
+    @property
+    def flag(self):
+        """Indicating status of a particle (active, out of plane, ...)"""
+        return self._flag
+
+    @property
+    def irrad_photons(self):
+        """The number of photons irradiated by the particles on the sensor"""
+        return self._source_intensity
+
+    @irrad_photons.setter
+    def irrad_photons(self, value):
+        assert value.ndim == 1, f"Expected 1D array, got {value.ndim}D"
+        assert value.size == self.n_particles, f"Expected array of size {self.n_particles}, got {value.size}"
+        self.irrad_photons = value
+
+    @property
+    def n_particles(self):
+        """Return the number of particles. Equal to `len(self)`"""
+        return self.x.size
+
+    def reset(self):
+        """Sets all intensities to zero and flags to zero"""
+        self._source_intensity = np.zeros_like(self.x)
+        self._max_image_photons = np.zeros_like(self.x)
+        self._image_electrons = np.zeros_like(self.x)
+        self._image_quantized_electrons = np.zeros_like(self.x)
+        self._flag = np.zeros_like(self.x, dtype=int)
 
     def __len__(self):
         return self.x.size
-
-    def __getitem__(self, item):
-        return Particles(x=self.x[item],
-                         y=self.y[item],
-                         z=self.z[item],
-                         size=self.size[item],
-                         intensity=self.intensity[item],
-                         flag=self.flag[item])
-
-    def __iter__(self):
-        for i in range(len(self)):
-            yield self[i]
 
     def dict(self) -> Dict:
         """Returns a dictionary representation of the particle data"""
@@ -106,8 +213,22 @@ class Particles:
                 'y': self.y,
                 'z': self.z,
                 'size': self.size,
-                'intensity': self.intensity,
-                'flag': self.flag}
+                'flag': self.flag,
+                'source_intensity': self.source_intensity,
+                'max_image_photons': self.max_image_photons,
+                'image_electrons': self.image_electrons,
+                'image_quantized_electrons': self.image_quantized_electrons}
+
+    def __getitem__(self, item):
+        data: Dict = self.dict()
+        x = data['x'][item]
+        if x.ndim == 0:
+            return Particles(**{k: [v[item], ] for k, v in data.items()})
+        return Particles(**{k: v[item] for k, v in data.items()})
+
+    def __iter__(self):
+        for i in range(len(self)):
+            yield self[i]
 
     def model_dump(self) -> Dict:
         """Returns a dictionary representation of the particle data where list instead of
@@ -116,7 +237,7 @@ class Particles:
                 'y': self.y.tolist(),
                 'z': self.z.tolist(),
                 'size': self.size.tolist(),
-                'intensity': self.intensity.tolist(),
+                'intensity': self.source_intensity.tolist(),
                 'flag': self.flag.tolist()}
 
     def displace(self, dx=None, dy=None, dz=None):
@@ -147,7 +268,8 @@ class Particles:
                               y=new_y,
                               z=new_z,
                               size=self.size,
-                              intensity=None,
+                              source_intensity=None,
+                              max_image_photons=None,
                               flag=None)
 
     @property
@@ -251,7 +373,7 @@ class Particles:
                                     y=self.y - other.y,
                                     z=self.z - other.z,
                                     size=self.size - other.size,
-                                    intensity=self.intensity - other.intensity,
+                                    intensity=self.source_intensity - other.source_intensity,
                                     flagA=self.flag,
                                     flagB=other.flag)
 
@@ -270,7 +392,35 @@ def compute_intensity_distribution(
         sigmay,
         fill_ratio_x,
         fill_ratio_y):
-    """Computes the sensor intensity based on the error function as used in SIG by Lecordier et al. (2003)"""
+    """Computes the sensor intensity based on the error function as used in SIG by Lecordier et al. (2003)
+
+    Parameters
+    ----------
+    x : np.ndarray
+        x-coordinate of the sensor pixels
+    y : np.ndarray
+        y-coordinate of the sensor pixels
+    xp : float
+        x-coordinate of the particles on the sensor in pixels
+    yp : float
+        y-coordinate of the particles on thesensor in pixels
+    dp : float
+        particle image diameter (in pixels)
+    sigmax : float
+        standard deviation of the Gaussian in x-direction
+    sigmay : float
+        standard deviation of the Gaussian in y-direction
+    fill_ratio_x : float
+        fill ratio of the sensor in x-direction
+    fill_ratio_y : float
+        fill ratio of the sensor in y-direction
+
+    Returns
+    -------
+    np.ndarray
+        The intensity distribution of the particles on the sensor
+
+    """
     frx05 = 0.5 * fill_ratio_x
     fry05 = 0.5 * fill_ratio_y
     dxp = x - xp
@@ -296,12 +446,10 @@ def model_image_particles(
     """Model the photons irradiated by the particles on the sensor."""
     image_shape = (ny, nx)
     irrad_photons = np.zeros(image_shape)
-    xp = particles.x
-    yp = particles.y
-    particle_sizes = particles.size
-    part_intensity = particles.intensity
     delta = int(PARTICLE_INFLUENCE_FACTOR * max(sigmax, sigmay))
-    for x, y, p_size, pint in zip(xp, yp, particle_sizes, part_intensity):
+    max_image_photons = np.zeros_like(particles.x)
+    for ip, (x, y, p_size, pint) in enumerate(
+            zip(particles.x, particles.y, particles.size, particles.source_intensity)):
         xint = int(x)
         yint = int(y)
         xmin = max(0, xint - delta)
@@ -324,4 +472,5 @@ def model_image_particles(
             fill_ratio_y=fill_ratio_y,
         )
         irrad_photons[ymin:ymax, xmin:xmax] += Ip * pint
-    return irrad_photons
+        max_image_photons[ip] = np.max(Ip * pint)
+    return irrad_photons, max_image_photons

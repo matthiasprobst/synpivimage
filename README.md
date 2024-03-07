@@ -25,6 +25,11 @@ counts = (RLI x 2**BIT + NOISE ) x QE
 For *no noise* and RLI=1 a particle will be seen with maximal pixel count in the image. This means, that a slight
 overlap will saturate the camera. Therefore the VLI should be < 1
 
+
+## Noise note:
+A particle peak intensity one the sensor, which is below 3 times sigma_{noise} will be flagged as non existing due to 
+too weak illumination.
+
 ## Installation
 
 Navigate to the repository folder and run

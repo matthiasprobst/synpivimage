@@ -13,6 +13,8 @@ from .particles import Particles, compute_intensity_distribution, ParticleFlag
 
 LOGGER = logging.getLogger('synpivimage')
 COUNT_EDGE_PARTICLES = False
+NSIGMA_NOISE_THRESHOLD = 3  # 3*dark_noise=3*sigma_dark_noise should be the threshold for the particle intensity.
+# if the peak intensity is below that, the particle is considered not be have an influence on the cross correlation.
 SQRT2 = np.sqrt(2)
 # from .noise import add_camera_noise
 
@@ -32,6 +34,19 @@ def take_image(laser: Laser,
     function does not regenerate new particles!
     2. Captures the image
     3. Returns the image
+
+    Parameters
+    ----------
+    laser : Laser
+        The laser object containing the laser parameters
+    cam : Camera
+        The camera object containing the camera parameters
+    particles : Particles
+        The particles to be imaged
+    particle_peak_count : int
+        The peak count of the particles
+    kwargs : dict
+        Additional parameters
     """
     logger = kwargs.get('logger', LOGGER)
     # compute the particle intensity factor in order to reach particle_peak_count
@@ -49,16 +64,18 @@ def take_image(laser: Laser,
         fill_ratio_y=cam.fill_ratio_y
     )
     intensity_factor = (particle_peak_count + 1) / max_part_intensity / cam.qe / cam.sensitivity
+    # assert int(intensity_factor * max_part_intensity) == 1000
 
     # compute the noise level:
     if cam.shot_noise:
-        sqrtN = np.sqrt(cam.dark_noise)
+        sqrtN = np.sqrt(max_part_intensity * intensity_factor)
     else:
         sqrtN = 0
-    threshold_noise_level = cam.dark_noise + sqrtN
 
     # illuminate the particles (max intensity will be one. this is only the laser intensity assigned to the particles!)
-    particles = laser.illuminate(particles)
+    particles = laser.illuminate(particles)  # range between 0 and 1
+    assert np.min(particles.source_intensity) >= 0
+    assert np.max(particles.source_intensity) <= 1
 
     hips = cam.particle_image_diameter / 2  # half image particle size
     if COUNT_EDGE_PARTICLES:
@@ -75,11 +92,17 @@ def take_image(laser: Laser,
     particles.flag[~in_fov] = ParticleFlag.DISABLED.value
     particles.flag[in_fov] = ParticleFlag.IN_FOV.value  # in the next step we check if they are illuminated
 
-    weakly_illuminated = particles.intensity * particle_peak_count <= threshold_noise_level
+    # the dark noise should not be greater that the particle intensity, otherwise the particle will not be visible
+    # the total particle intensity is the baseline noise + the particle intensity + the shot noise (if enabled)
+    # + the dark noise.
+    illumination_threshold = max(NSIGMA_NOISE_THRESHOLD * cam.dark_noise + sqrtN, np.exp(-2) * particle_peak_count)
+    weakly_illuminated = particles.source_intensity * particle_peak_count <= illumination_threshold
     # disable the particles due to weak illumination (mark only IN-FOV-particles like this!):
     particles.flag[weakly_illuminated] += ParticleFlag.OUT_OF_PLANE.value
     particles.flag[~weakly_illuminated] += ParticleFlag.ILLUMINATED.value
-    particles.intensity = np.multiply(particles.intensity, intensity_factor)
+    # update the particle source intensities
+    particles.source_intensity = np.multiply(particles.source_intensity, intensity_factor)
+    # particles.image_max_noiseless_intensity = np.multiply(particles.source_intensity, intensity_factor)
 
     n_too_weak = np.sum(weakly_illuminated)
     logger.debug(f'Particles with intensity below the noise level: {n_too_weak}')

@@ -23,8 +23,7 @@ def compute_dark_noise(mean: float, std: float, shape: Tuple[int, int]) -> np.nd
     """adds gaussian noise to an array"""
     if mean == 0:
         return np.zeros(shape=shape)
-    row, col = shape
-    gnoise = np.random.normal(mean, std, (row, col))
+    gnoise = np.random.normal(mean, std, shape)
     gnoise[gnoise < 0] = 0
     return gnoise
 

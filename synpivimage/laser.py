@@ -1,15 +1,19 @@
 import logging
 import matplotlib.pyplot as plt
 import numpy as np
+import pathlib
 from pydantic import BaseModel
+from typing import Union
 
 from .component import Component
 from .particles import Particles
-from .validation import PositiveFloat, PositiveInt
+from .validation import PositiveInt, PositiveFloat
 
 LOGGER = logging.getLogger('synpivimage')
 
 SQRT2 = np.sqrt(2)
+SQRT2pi = np.sqrt(2 * np.pi)
+SQRT2pi_2 = 2 * np.sqrt(2 * np.pi)
 DEBUG_LEVEL = 0
 
 
@@ -20,7 +24,7 @@ class real:
         self.s = s
 
     def __call__(self, z):
-        return np.exp(-1 / np.sqrt(2 * np.pi) * np.abs(2 * z ** 2 / self.dz0 ** 2) ** self.s)
+        return np.exp(-1 / SQRT2pi * np.abs(2 * z ** 2 / self.dz0 ** 2) ** self.s)
 
 
 class tophat:
@@ -31,8 +35,8 @@ class tophat:
 
     def __call__(self, z) -> np.ndarray:
         intensity = np.ones_like(z)
-        intensity[z < -self.dz0] = 0
-        intensity[z > self.dz0] = 0
+        intensity[z < -self.dz0 / 2] = 0
+        intensity[z > self.dz0 / 2] = 0
         return intensity
 
 
@@ -42,7 +46,14 @@ def const(z):
 
 
 class Laser(BaseModel, Component):
-    """Laser class. This class will be used to illuminate the particles"""
+    """Laser class. This class will be used to illuminate the particles.
+
+    Note, that gaussian distribution is found for shape_factor=1, not =2 as
+    in the literature (which is wrong, e.g. see Raffel et al.)!
+    width is the width of the laser, where the intensity drops to 0.67, i.e.
+    not the effective laser width, with is defined by the noise level or where
+    the intensity drops to e^(-1).
+    """
     shape_factor: PositiveInt
     width: PositiveFloat  # width of the laser, not the effective laser width
 
@@ -50,20 +61,36 @@ class Laser(BaseModel, Component):
                    particles: Particles,
                    **kwargs):
         """Illuminate the particles. The values will be between 0 and 1.
-        Particles outside the laser will be masked"""
+        Particles outside the laser will be masked.
+
+        Parameters
+        ----------
+        particles : Particles
+            The particles to be illuminated
+        kwargs : dict
+            Additional parameters
+
+        Returns
+        -------
+        Particles
+            The illuminated particles (new object!)
+        """
         logger = kwargs.get('logger', LOGGER)
+
+        # the width of a laser is defined as:
+        # intensity drops to 1-e
 
         dz0 = SQRT2 * self.width / 2
         s = self.shape_factor
         if s == 0:
             laser_intensity = const
         elif s > 100:
-            laser_intensity = tophat(dz0)
+            laser_intensity = tophat(self.width)
         else:
             laser_intensity = real(dz0, s)
-        particles.intensity = laser_intensity(particles.z)
+        particles.source_intensity = laser_intensity(particles.z)
 
-        inside_laser = particles.intensity > np.exp(-2)
+        inside_laser = particles.source_intensity > np.exp(-2)
 
         particles.mask = inside_laser  # mask for the particles inside the laser
 
@@ -76,28 +103,47 @@ class Laser(BaseModel, Component):
 
         if DEBUG_LEVEL > 1:
             plt.figure()
-            plt.plot(particles.z[inside_laser], particles.intensity[inside_laser], 'o', color='g')
-            plt.plot(particles.z[~inside_laser], particles.intensity[~inside_laser], 'o', color='r')
+            plt.plot(particles.z[inside_laser], particles.source_intensity[inside_laser], 'o', color='g')
+            plt.plot(particles.z[~inside_laser], particles.source_intensity[~inside_laser], 'o', color='r')
             plt.xlabel('z / real arbitrary units')
             plt.ylabel('Normalized particle intensity in beam / -')
             plt.grid()
             plt.show()
-        return particles
+        return Particles(**particles.dict())
 
-    # def illuminate12(self,
-    #                  mean_size: float,
-    #                  std_size: float,
-    #                  n_particles: int,
-    #                  cam: Camera):
-    #     """First shot. No particle input expected. The
-    #     particles will be generated randomly and uniformly."""
-    #     if std_size == 0:
-    #         particle_distribution_props = mean_size
-    #     else:
-    #         assert std_size > 0
-    #         particle_distribution_props = (mean_size, std_size)
-    #     particles = Particles.generate_uniform(n_particles,
-    #                                            particle_distribution_props,
-    #                                            cam.x_bounds,
-    #                                            cam.y_bounds,
-    #                                            cam.z_bounds)
+    def save_jsonld(self, filename: Union[str, pathlib.Path]):
+        """Save the component to JSON"""
+        from pivmetalib import pivmeta
+        filename = pathlib.Path(filename)  # .with_suffix('.jsonld')
+        laser = pivmeta.Laser(
+            hasParameter=[
+                pivmeta.NumericalVariable(
+                    label='width',
+                    hasNumericalValue=self.width,
+                    hasStandardName='https://matthiasprobst.github.io/pivmeta#laser_sheet_thickness',
+                    hasUnit='mm',
+                    hasKindOfQuantity='https://qudt.org/vocab/unit/MilliM',
+                    hasVariableDescription='Laser width'),
+                pivmeta.NumericalVariable(
+                    label='shape_factor',
+                    hasNumericalValue=self.shape_factor,
+                    hasStandardName='https://matthiasprobst.github.io/pivmeta#laser_sheet_thickness',
+                    hasUnit='',
+                    hasKindOfQuantity="https://qudt.org/schema/qudt/DimensionlessUnit",
+                    hasVariableDescription='The shape factor describes they laser beam shape. A '
+                                           'value of 2 describes Gaussian beam shape. '
+                                           'High value are top-hat-like shapes.'),
+            ]
+        )
+        with open(filename, 'w') as f:
+            f.write(
+                laser.dump_jsonld()
+            )
+        return filename
+
+
+class GaussShapeLaser(Laser):
+    """Gaussian laser"""
+
+    def __init__(self, width: float):
+        super().__init__(shape_factor=1, width=width)
