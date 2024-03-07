@@ -86,7 +86,8 @@ class Camera(BaseModel, Component):
 
         Returns image and number of saturated pixels.
         """
-        active = particles.active
+        # active = particles.active
+        active = particles.in_fov
         irrad_photons, particles.max_image_photons[active] = model_image_particles(
             particles[active],
             nx=self.nx,
