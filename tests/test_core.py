@@ -1,9 +1,10 @@
+import h5py
 import logging
-import matplotlib.pyplot as plt
 import numpy as np
 import pathlib
 import unittest
 
+from synpivimage import io
 from synpivimage import take_image
 from synpivimage.camera import Camera
 from synpivimage.laser import Laser
@@ -125,13 +126,6 @@ class TestCore(unittest.TestCase):
             shape_factor=1000
         )
 
-    def tearDown(self) -> None:
-        """delete created files"""
-        for suffix in ('.hdf', '.tif', '.json'):
-            filenames = __this_dir__.glob(f'*{suffix}')
-            for hdf_filename in filenames:
-                hdf_filename.unlink()
-
     def test_source_density(self):
         """
         Source density:
@@ -191,13 +185,11 @@ class TestCore(unittest.TestCase):
         self.assertAlmostEqual(imgA.max(), particle_peak_count, delta=1)
         self.assertEqual(1, np.asarray(particlesA.flag & ParticleFlag.ILLUMINATED.value, dtype=bool).sum())
 
-        from synpivimage import io
-        io.imwrite('img01a.tiff',
-                   imgA[:],
-                   cam=self.cam,
-                   laser=self.laser,
-                   overwrite=True)
-        import h5py
+        img01a_filename = io.imwrite('img01a.tiff',
+                                     imgA[:],
+                                     cam=self.cam,
+                                     laser=self.laser,
+                                     overwrite=True)
         with h5py.File('img01a.hdf', 'w') as h5:
             io.hdfwrite(group=h5,
                         img=imgA,
@@ -205,16 +197,16 @@ class TestCore(unittest.TestCase):
                         laser=self.laser,
                         particles=particlesA)
 
-        plt.figure()
-        plt.imshow(imgA, cmap='gray')
-        plt.colorbar()
-        for p in particles[particles.active]:
-            plt.scatter(p.x, p.y, s=100, c='g', marker='x')
-
-        for p in particles[~particles.active]:
-            plt.scatter(p.x, p.y, s=100, c='r', marker='x')
-
-        plt.show()
+        # plt.figure()
+        # plt.imshow(imgA, cmap='gray')
+        # plt.colorbar()
+        # for p in particles[particles.active]:
+        #     plt.scatter(p.x, p.y, s=100, c='g', marker='x')
+        #
+        # for p in particles[~particles.active]:
+        #     plt.scatter(p.x, p.y, s=100, c='r', marker='x')
+        #
+        # plt.show()
 
         # n_particles = 5
         # particles = Particles(
@@ -223,6 +215,9 @@ class TestCore(unittest.TestCase):
         #     z=np.random.uniform(-laser.width, laser.width, n_particles),
         #     size=np.ones(n_particles) * 2
         # )
+        pathlib.Path(img01a_filename).unlink(missing_ok=True)
+        pathlib.Path(pathlib.Path('img01a.hdf')).unlink(missing_ok=True)
+        pathlib.Path(pathlib.Path('img01a.json')).unlink(missing_ok=True)
 #
 #
 # class TestCore(unittest.TestCase):

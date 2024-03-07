@@ -16,6 +16,10 @@ class TestIO(unittest.TestCase):
         """delete created files"""
         for filename in self.filenames:
             pathlib.Path(filename).unlink(missing_ok=True)
+        for filename in __this_dir__.glob('*.tiff'):
+            filename.unlink(missing_ok=True)
+        for filename in __this_dir__.glob('*.json'):
+            filename.unlink(missing_ok=True)
 
     def test_write_particle_data(self):
         from synpivimage.io import metawrite
@@ -34,6 +38,7 @@ class TestIO(unittest.TestCase):
             fill_ratio_y=1.0,
             sigmax=1,
             sigmay=1,
+            particle_image_diameter=2,
         )
 
         n = 40
@@ -41,9 +46,9 @@ class TestIO(unittest.TestCase):
             x=np.random.uniform(-5, cam.nx - 1, n),
             y=np.random.uniform(-10, cam.ny - 1, n),
             z=np.random.uniform(-1, 1, n),
-            size=2
+            size=np.ones(n) * 2,
         )
-
+        self.filenames.append('particles.json')
         metawrite(filename='particles.json', metadata=dict(particles=particles))
 
     def test_imwrite_imread_16(self):
