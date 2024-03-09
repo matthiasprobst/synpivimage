@@ -1,5 +1,5 @@
 import pathlib
-from typing import Tuple, Union
+from typing import Tuple, Union, Optional
 
 import numpy as np
 from pydantic import BaseModel
@@ -27,6 +27,7 @@ class Camera(BaseModel, Component):
     fill_ratio_x: FillRatio
     fill_ratio_y: FillRatio
     particle_image_diameter: PositiveFloat
+    seed: Optional[int] = None
 
     @property
     def size(self) -> int:
@@ -74,7 +75,9 @@ class Camera(BaseModel, Component):
                                     self.shot_noise,
                                     self.baseline_noise,
                                     self.dark_noise,
-                                    self.qe)
+                                    self.qe,
+                                    rs=np.random.RandomState(self.seed)
+                                    )
         return electrons
 
     def take_image(self, particles: Particles) -> Tuple[np.ndarray, int]:

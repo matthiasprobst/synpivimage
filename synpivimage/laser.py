@@ -16,7 +16,6 @@ LOGGER = logging.getLogger('synpivimage')
 
 SQRT2 = np.sqrt(2)
 SQRT2pi = np.sqrt(2 * np.pi)
-SQRT2pi_2 = 2 * np.sqrt(2 * np.pi)
 DEBUG_LEVEL = 0
 
 
@@ -128,15 +127,13 @@ class Laser(BaseModel, Component):
                     label='width',
                     hasNumericalValue=self.width,
                     hasStandardName=PIVMETA.laser_sheet_thickness,
-                    # 'https://matthiasprobst.github.io/pivmeta#laser_sheet_thickness',
                     hasUnit='mm',
                     hasKindOfQuantity=QUDT_UNIT.MilliM,  # 'https://qudt.org/vocab/unit/MilliM',
                     hasVariableDescription='Laser width'),
                 pivmeta.NumericalVariable(
                     label='shape_factor',
                     hasNumericalValue=self.shape_factor,
-                    hasStandardName=PIVMETA.laser_sheet_shape_factor,
-                    # 'https://matthiasprobst.github.io/pivmeta#laser_sheet_thickness',
+                    hasStandardName=PIVMETA.model_laser_sheet_shape_factor,
                     hasUnit='',
                     hasKindOfQuantity="https://qudt.org/schema/qudt/DimensionlessUnit",
                     hasVariableDescription='The shape factor describes they laser beam shape. A '

@@ -46,4 +46,7 @@ default.yaml
 
 examples/*.json
 examples/*.jsonld
+examples/*.tif
+examples/double_img
+examples/single_img
 *.bak
