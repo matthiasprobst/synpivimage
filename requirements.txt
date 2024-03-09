@@ -2,8 +2,6 @@ numpy
 pandas
 pathlib
 h5py
-xarray
-tifffile
 pyyaml
 tqdm
 matplotlib
@@ -11,3 +9,8 @@ python-dotenv
 opencv-python
 PyQt5
 scipy
+pivimage
+pydantic
+ontolutils
+pivmetalib @ git+https://github.com/matthiasprobst/pivmetalib
+ontolutils @ git+https://github.com/matthiasprobst/ontology-utils
