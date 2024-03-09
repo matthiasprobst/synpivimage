@@ -13,7 +13,7 @@ from .particles import Particles, compute_intensity_distribution, ParticleFlag
 
 LOGGER = logging.getLogger('synpivimage')
 COUNT_EDGE_PARTICLES = False
-NSIGMA_NOISE_THRESHOLD = 3  # 3*dark_noise=3*sigma_dark_noise should be the threshold for the particle intensity.
+NSIGMA_NOISE_THRESHOLD = 4  # 4*dark_noise=4*sigma_dark_noise should be the threshold for the particle intensity.
 # if the peak intensity is below that, the particle is considered not be have an influence on the cross correlation.
 SQRT2 = np.sqrt(2)
 # from .noise import add_camera_noise
