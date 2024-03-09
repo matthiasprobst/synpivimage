@@ -1,9 +1,13 @@
 import enum
-import numpy as np
-import scipy
+import pathlib
 from copy import deepcopy
 from dataclasses import dataclass
 from typing import Tuple, Union, Dict, Optional, List
+
+import numpy as np
+import scipy
+
+from .component import Component
 
 SQRT2 = np.sqrt(2)
 PARTICLE_INFLUENCE_FACTOR = 6
@@ -37,7 +41,7 @@ class ParticleDisplacement:
         return f'ParticleDisplacement()'
 
 
-class Particles:
+class Particles(Component):
     """Particle class
 
     Contains position, size and flag information:
@@ -237,8 +241,75 @@ class Particles:
                 'y': self.y.tolist(),
                 'z': self.z.tolist(),
                 'size': self.size.tolist(),
-                'intensity': self.source_intensity.tolist(),
+                'source_intensity': self.source_intensity.tolist(),
+                'max_image_photons': self.max_image_photons.tolist(),
+                'image_electrons': self.image_electrons.tolist(),
+                'image_quantized_electrons': self.image_quantized_electrons.tolist(),
                 'flag': self.flag.tolist()}
+
+    def save_jsonld(self, filename: Union[str, pathlib.Path]):
+        from pivmetalib import pivmeta
+        from pivmetalib import m4i
+        from .codemeta import get_package_meta
+        filename = pathlib.Path(filename)  # .with_suffix('.jsonld')
+
+        source_intensity = 0. if np.all(self.source_intensity == 0) else self.source_intensity.tolist()
+        max_image_photons = 0. if np.all(self.max_image_photons == 0) else self.max_image_photons.tolist()
+        image_electrons = 0. if np.all(self.image_electrons == 0) else self.image_electrons.tolist()
+        image_quantized_electrons = 0. if np.all(
+            self.image_quantized_electrons == 0) else self.image_quantized_electrons.tolist()
+
+        hasParameter = [
+            m4i.variable.NumericalVariable(
+                label='x',
+                hasNumericalValue=self.x.tolist()
+            ),
+            m4i.variable.NumericalVariable(
+                label='y',
+                hasNumericalValue=self.y.tolist()
+            ),
+            m4i.variable.NumericalVariable(
+                label='z',
+                hasNumericalValue=self.z.tolist()
+            ),
+            m4i.variable.NumericalVariable(
+                label='size',
+                hasNumericalValue=self.size.tolist()
+            ),
+            m4i.variable.NumericalVariable(
+                label='flag',
+                hasNumericalValue=self.flag.tolist()
+            ),
+            m4i.variable.NumericalVariable(
+                label='source_intensity',
+                hasNumericalValue=source_intensity
+            ),
+            m4i.variable.NumericalVariable(
+                label='max_image_photons',
+                hasNumericalValue=max_image_photons
+            ),
+            m4i.variable.NumericalVariable(
+                label='image_electrons',
+                hasNumericalValue=image_electrons
+            ),
+            m4i.variable.NumericalVariable(
+                label='image_quantized_electrons',
+                hasNumericalValue=image_quantized_electrons
+            ),
+        ]
+        particles = pivmeta.SyntheticParticle(
+            hasSourceCode=get_package_meta(),
+            hasParameter=hasParameter
+        )
+        with open(filename, 'w') as f:
+            f.write(
+                particles.model_dump_jsonld(
+                    # context={
+                    #     "@import": 'https://raw.githubusercontent.com/matthiasprobst/pivmeta/main/pivmeta_context.jsonld',
+                    # }
+                )
+            )
+        return filename
 
     def displace(self, dx=None, dy=None, dz=None):
         """Displace the particles. Can only be done if particles are not inactive.

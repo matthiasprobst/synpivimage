@@ -1,8 +1,9 @@
-import h5py
 import logging
-import numpy as np
 import pathlib
+import shutil
 import unittest
+
+import numpy as np
 
 from synpivimage import io
 from synpivimage import take_image
@@ -185,37 +186,23 @@ class TestCore(unittest.TestCase):
         self.assertAlmostEqual(imgA.max(), particle_peak_count, delta=1)
         self.assertEqual(1, np.asarray(particlesA.flag & ParticleFlag.ILLUMINATED.value, dtype=bool).sum())
 
-        img01a_filename = io.imwrite('img01a.tiff',
-                                     imgA[:],
-                                     cam=self.cam,
-                                     laser=self.laser,
-                                     overwrite=True)
-        with h5py.File('img01a.hdf', 'w') as h5:
-            io.hdfwrite(group=h5,
-                        img=imgA,
-                        camera=self.cam,
-                        laser=self.laser,
-                        particles=particlesA)
+        # save multiples:
+        iw = io.Imwriter(image_dir=__this_dir__, case_name='test_imgs_01', camera=self.cam, laser=self.laser,
+                         overwrite=True)
+        with iw as imwriter:
+            for i in range(10):
+                imgA, particlesA = take_image(self.laser, self.cam, particles, particle_peak_count)
+                imwriter.writeA(imgA, particlesA)
+                imwriter.writeB(imgA, particlesA)
 
-        # plt.figure()
-        # plt.imshow(imgA, cmap='gray')
-        # plt.colorbar()
-        # for p in particles[particles.active]:
-        #     plt.scatter(p.x, p.y, s=100, c='g', marker='x')
-        #
-        # for p in particles[~particles.active]:
-        #     plt.scatter(p.x, p.y, s=100, c='r', marker='x')
-        #
-        # plt.show()
+        self.assertTrue(iw.img_filenames[0].exists())
+        self.assertTrue(iw.img_filenames[0].is_file())
+        self.assertEqual(iw.img_filenames[0].parent.name, 'imgs')
+        self.assertEqual(iw.img_filenames[0].suffix, '.tif')
 
-        # n_particles = 5
-        # particles = Particles(
-        #     x=np.random.uniform(0, cam.nx - 1, n_particles),
-        #     y=np.random.uniform(0, cam.ny - 1, n_particles),
-        #     z=np.random.uniform(-laser.width, laser.width, n_particles),
-        #     size=np.ones(n_particles) * 2
-        # )
-        pathlib.Path(img01a_filename).unlink(missing_ok=True)
+        shutil.rmtree(iw.image_dir)
+
+        pathlib.Path(pathlib.Path('img01a.tiff')).unlink(missing_ok=True)
         pathlib.Path(pathlib.Path('img01a.hdf')).unlink(missing_ok=True)
         pathlib.Path(pathlib.Path('img01a.json')).unlink(missing_ok=True)
 #

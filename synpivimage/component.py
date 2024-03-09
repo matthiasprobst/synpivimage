@@ -14,17 +14,14 @@ class SaveFormat(enum.Enum):
 class Component(abc.ABC):
     """Abstract class for a component, e.g. a laser or a camera"""
 
-    class Config:
-        extra = 'forbid'
-
-    def save(self, filename: Union[str, pathlib.Path],
-             format: SaveFormat = SaveFormat.JSON) -> pathlib.Path:
-        """Save the component to a format specified by `format`"""
-        filename = pathlib.Path(filename)
-        if SaveFormat(format) == SaveFormat.JSON:
-            return self.save_json(filename)
-        if SaveFormat(format) == SaveFormat.JSONLD:
-            return self.save_jsonld(filename)
+    # def save(self, filename: Union[str, pathlib.Path],
+    #          format: SaveFormat = SaveFormat.JSON) -> pathlib.Path:
+    #     """Save the component to a format specified by `format`"""
+    #     filename = pathlib.Path(filename)
+    #     if SaveFormat(format) == SaveFormat.JSON:
+    #         return self.save_json(filename)
+    #     if SaveFormat(format) == SaveFormat.JSONLD:
+    #         return self.save_jsonld(filename)
 
     def save_json(self, filename: Union[str, pathlib.Path]):
         """Save the component to JSON"""
@@ -37,19 +34,19 @@ class Component(abc.ABC):
     def save_jsonld(self, filename: Union[str, pathlib.Path]) -> pathlib.Path:
         """Save the component to JSON"""
 
-    @classmethod
-    def load(cls, filename: Union[str, pathlib.Path]):
-        """Load the component from JSON"""
-        filename = pathlib.Path(filename).with_suffix('.json')
-        with open(filename) as f:
-            data = json.load(f)
-        return cls(**data)
+    # @classmethod
+    # def load(cls, filename: Union[str, pathlib.Path]):
+    #     """Load the component from JSON"""
+    #     filename = pathlib.Path(filename).with_suffix('.json')
+    #     with open(filename) as f:
+    #         data = json.load(f)
+    #     return cls(**data)
 
 
-def save_multiple(components: List[Component],
-                  filename: Union[str, pathlib.Path]):
-    """Saves multiple components into a single file"""
-    filename = pathlib.Path(filename).with_suffix('.json')
-    with open(filename, 'w') as f:
-        for component in components:
-            json.dump(component.model_dump(), f, indent=4)
+# def save_multiple(components: List[Component],
+#                   filename: Union[str, pathlib.Path]):
+#     """Saves multiple components into a single file"""
+#     filename = pathlib.Path(filename).with_suffix('.json')
+#     with open(filename, 'w') as f:
+#         for component in components:
+#             json.dump(component.model_dump(), f, indent=4)

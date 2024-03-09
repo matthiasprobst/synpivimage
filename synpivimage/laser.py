@@ -1,10 +1,13 @@
 import logging
-import matplotlib.pyplot as plt
-import numpy as np
 import pathlib
-from pydantic import BaseModel
 from typing import Union
 
+import matplotlib.pyplot as plt
+import numpy as np
+from ontolutils.namespacelib import PIVMETA, QUDT_UNIT
+from pydantic import BaseModel
+
+from .codemeta import get_package_meta
 from .component import Component
 from .particles import Particles
 from .validation import PositiveInt, PositiveFloat
@@ -113,31 +116,38 @@ class Laser(BaseModel, Component):
 
     def save_jsonld(self, filename: Union[str, pathlib.Path]):
         """Save the component to JSON"""
-        from pivmetalib import pivmeta
+        try:
+            from pivmetalib import pivmeta
+        except ImportError:
+            raise ImportError("Please install `pivmetalib` to use this function: `pip install pivmetalib`")
+
         filename = pathlib.Path(filename)  # .with_suffix('.jsonld')
-        laser = pivmeta.Laser(
+        laser = pivmeta.LaserModel(
             hasParameter=[
                 pivmeta.NumericalVariable(
                     label='width',
                     hasNumericalValue=self.width,
-                    hasStandardName='https://matthiasprobst.github.io/pivmeta#laser_sheet_thickness',
+                    hasStandardName=PIVMETA.laser_sheet_thickness,
+                    # 'https://matthiasprobst.github.io/pivmeta#laser_sheet_thickness',
                     hasUnit='mm',
-                    hasKindOfQuantity='https://qudt.org/vocab/unit/MilliM',
+                    hasKindOfQuantity=QUDT_UNIT.MilliM,  # 'https://qudt.org/vocab/unit/MilliM',
                     hasVariableDescription='Laser width'),
                 pivmeta.NumericalVariable(
                     label='shape_factor',
                     hasNumericalValue=self.shape_factor,
-                    hasStandardName='https://matthiasprobst.github.io/pivmeta#laser_sheet_thickness',
+                    hasStandardName=PIVMETA.laser_sheet_shape_factor,
+                    # 'https://matthiasprobst.github.io/pivmeta#laser_sheet_thickness',
                     hasUnit='',
                     hasKindOfQuantity="https://qudt.org/schema/qudt/DimensionlessUnit",
                     hasVariableDescription='The shape factor describes they laser beam shape. A '
-                                           'value of 2 describes Gaussian beam shape. '
+                                           'value of 1 describes Gaussian beam shape. '
                                            'High value are top-hat-like shapes.'),
-            ]
+            ],
+            hasSourceCode=get_package_meta(),
         )
         with open(filename, 'w') as f:
             f.write(
-                laser.dump_jsonld()
+                laser.model_dump_jsonld(context={'local': 'http://example.org/'})
             )
         return filename
 

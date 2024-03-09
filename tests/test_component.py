@@ -8,11 +8,11 @@ class TestComponents(unittest.TestCase):
 
     def test_save_component(self):
         cam = Laser(shape_factor=2, width=0.1)
-        filename = cam.save('laser.json')
+        filename = cam.save_json('laser.json')
         self.assertEqual(filename.suffix, '.json')
         self.assertTrue(filename.exists())
         filename.unlink()
-        filename = cam.save('laser')
+        filename = cam.save_json('laser')
         self.assertTrue(filename.exists())
         self.assertEqual(filename.suffix, '.json')
 

@@ -1,7 +1,8 @@
-import numpy as np
 import pathlib
-from pydantic import BaseModel
 from typing import Tuple, Union
+
+import numpy as np
+from pydantic import BaseModel
 from typing_extensions import Annotated
 
 from . import noise
@@ -106,6 +107,7 @@ class Camera(BaseModel, Component):
         """Save the component to JSON"""
         from pivmetalib import pivmeta
         from pivmetalib import m4i
+        from .codemeta import get_package_meta
         filename = pathlib.Path(filename)  # .with_suffix('.jsonld')
 
         def _build_iri(sn: str):
@@ -174,12 +176,17 @@ class Camera(BaseModel, Component):
             m4i.variable.TextVariable(label='shot_noise',
                                       hasStringValue=shot_noise_txt_value)
         )
-
-        camera = pivmeta.DigitalCamera(
+        camera = pivmeta.DigitalCameraModel(
+            hasSourceCode=get_package_meta(),
             hasParameter=hasParameter
         )
         with open(filename, 'w') as f:
             f.write(
-                camera.dump_jsonld()
+                camera.model_dump_jsonld(
+                    context={
+                        "@import": 'https://raw.githubusercontent.com/matthiasprobst/pivmeta/main/pivmeta_context.jsonld',
+                        # "codemeta": 'https://codemeta.github.io/terms/'
+                    }
+                )
             )
         return filename

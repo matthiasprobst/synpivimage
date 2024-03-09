@@ -42,3 +42,6 @@ testdata
 
 */default.yaml
 default.yaml
+
+examples/*.json
+examples/*.jsonld

@@ -1,8 +1,12 @@
-import numpy as np
 import pathlib
 import unittest
 
-from synpivimage import io
+import numpy as np
+from pivmetalib.pivmeta import LaserModel
+
+import synpivimage
+from synpivimage.camera import Camera
+from synpivimage.particles import Particles
 
 __this_dir__ = pathlib.Path(__file__).parent
 
@@ -21,10 +25,33 @@ class TestIO(unittest.TestCase):
         for filename in __this_dir__.glob('*.json'):
             filename.unlink(missing_ok=True)
 
+    def test_io_laser(self):
+        gauss_laser = synpivimage.Laser(
+            width=1,
+            shape_factor=1
+        )
+        gauss_laser_filename = gauss_laser.save_jsonld('laser.json')
+
+        loaded_laser = LaserModel.from_jsonld(gauss_laser_filename)[0]
+
+        self.assertIsInstance(loaded_laser, LaserModel)
+
+        with open(__this_dir__ / 'laser2.json', 'w') as f:
+            f.write(loaded_laser.model_dump_jsonld())
+
+        self.assertEqual(len(loaded_laser.hasParameter),
+                         2)
+        self.assertEqual(loaded_laser.hasParameter[0].label,
+                         'width')
+        self.assertEqual(str(loaded_laser.hasParameter[0].hasStandardName),
+                         'https://matthiasprobst.github.io/pivmeta#laser_sheet_thickness')
+        self.assertEqual(loaded_laser.hasParameter[0].hasNumericalValue,
+                         gauss_laser.width)
+
+        (__this_dir__ / 'laser.json').unlink(missing_ok=True)
+        (__this_dir__ / 'laser2.json').unlink(missing_ok=True)
+
     def test_write_particle_data(self):
-        from synpivimage.io import metawrite
-        from synpivimage.particles import Particles
-        from synpivimage.camera import Camera
         cam = Camera(
             nx=16,
             ny=16,
@@ -40,6 +67,8 @@ class TestIO(unittest.TestCase):
             sigmay=1,
             particle_image_diameter=2,
         )
+        cam.save_jsonld(filename='camera.json')
+        pathlib.Path('camera.json').unlink(missing_ok=True)
 
         n = 40
         particles = Particles(
@@ -48,49 +77,11 @@ class TestIO(unittest.TestCase):
             z=np.random.uniform(-1, 1, n),
             size=np.ones(n) * 2,
         )
-        self.filenames.append('particles.json')
-        metawrite(filename='particles.json', metadata=dict(particles=particles))
+        particles.save_jsonld(filename='particles.json')
 
-    def test_imwrite_imread_16(self):
-        im16 = np.random.randint(0, 2 ** 16 - 1, (16, 16), dtype=np.uint16)
-        filename = io.imwrite(__this_dir__ / 'im16.tiff',
-                              im16)
-        self.filenames.append(filename)
-        self.assertTrue(filename.exists())
+        pathlib.Path('particles.json').unlink(missing_ok=True)
 
-        with self.assertRaises(FileNotFoundError):
-            _ = io.imread('invalid.tiff', flags=-1)
-        im16load = io.imread(filename, flags=-1)
-        np.testing.assert_array_equal(im16, im16load)
-
-        filename = io.imwrite16(
-            __this_dir__ / 'im16.tiff',
-            overwrite=True,
-            img=im16
-        )
-        im16load = io.imread(filename, flags=-1)
-        np.testing.assert_array_equal(im16, im16load)
-        im16load = io.imread16(filename)
-        np.testing.assert_array_equal(im16, im16load)
-
-    def test_imwrite_imread_8(self):
-        im8 = np.random.randint(0, 2 ** 8 - 1, (16, 16), dtype=np.uint8)
-        filename = io.imwrite(__this_dir__ / 'im8.tiff',
-                              im8)
-        self.filenames.append(filename)
-        self.assertTrue(filename.exists())
-
-        with self.assertRaises(FileNotFoundError):
-            _ = io.imread('invalid.tiff', flags=-1)
-        im8load = io.imread(filename, flags=-1)
-        np.testing.assert_array_equal(im8, im8load)
-
-        filename = io.imwrite8(
-            __this_dir__ / 'im8.tiff',
-            overwrite=True,
-            img=im8
-        )
-        im8load = io.imread(filename, flags=-1)
-        np.testing.assert_array_equal(im8, im8load)
-        im8load = io.imread8(filename)
-        np.testing.assert_array_equal(im8, im8load)
+        # self.filenames.append('particles.json')
+        # metawrite(filename='particles.json',
+        #           metadata=dict(particles=particles),
+        #           format='json')

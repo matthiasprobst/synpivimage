@@ -49,9 +49,9 @@ class Centroid(PeakFit):
         nom2 = (self.j - 1) * cd + self.j * cc + (self.j + 1) * cu
         den2 = cu + cc + cd
         subp_peak_position = (
-            np.divide(nom2, den2, out=np.zeros(1),
+            self.i + np.divide(nom2, den2, out=np.zeros(1),
                       where=(den2 != 0.0))[0],
-            np.divide(nom1, den1, out=np.zeros(1),
+            self.j + np.divide(nom1, den1, out=np.zeros(1),
                       where=(den1 != 0.0))[0]
         )
         return subp_peak_position
