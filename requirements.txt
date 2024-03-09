@@ -1,0 +1,13 @@
+numpy
+pandas
+pathlib
+h5py
+xarray
+tifffile
+pyyaml
+tqdm
+matplotlib
+python-dotenv
+opencv-python
+PyQt5
+scipy

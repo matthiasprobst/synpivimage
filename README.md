@@ -1,5 +1,10 @@
 # synpivimage
 
+
+![Tests](https://github.com/matthiasprobst/synpivimage/actions/workflows/tests.yml/badge.svg)
+![DOCS](https://codecov.io/gh/matthiasprobst/synpivimage/branch/dev/graph/badge.svg)
+![pyvers](https://img.shields.io/badge/python-3.8%20%7C%203.9%20%7C%203.10%20%7C%203.11%20%7C%203.12-blue)
+
 Tool to build synthetic Particle Image Velocimetry (PIV) images based on commonly accepted literature.
 
 It uses the commonly used assumptions and DOES NOT include optical aberrations, such as lens distortion or such. Noise

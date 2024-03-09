@@ -1,3 +1,4 @@
+@ -1,47 +0,0 @@
 # build
 *.egg*
 build/
@@ -45,3 +46,4 @@ default.yaml
 
 examples/*.json
 examples/*.jsonld
+*.bak
