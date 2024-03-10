@@ -30,7 +30,7 @@ class TestIO(unittest.TestCase):
             width=1,
             shape_factor=1
         )
-        gauss_laser_filename = gauss_laser.save_jsonld('laser.json')
+        gauss_laser_filename = gauss_laser.save_jsonld(__this_dir__ / 'laser.json')
 
         loaded_laser = LaserModel.from_jsonld(gauss_laser_filename)[0]
 

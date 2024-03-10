@@ -25,9 +25,10 @@ class TestLaser(unittest.TestCase):
             width=0.25,
             shape_factor=2
         )
-        laser.save_jsonld(__this_dir__ / 'laser.json')
+        filename = laser.save_jsonld(__this_dir__ / 'laser.json')
         laser_loaded = Laser.load_jsonld(__this_dir__ / 'laser.json')[0]
         self.assertEqual(laser, laser_loaded)
+        filename.unlink(missing_ok=True)
 
     def test_effective_laser_width(self):
         """Test the effective laser width"""
