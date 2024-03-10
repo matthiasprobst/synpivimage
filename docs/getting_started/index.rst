@@ -15,4 +15,5 @@ You will learn how to:
     SingleImage.ipynb
     DoubleImage.ipynb
     Noise.ipynb
+    Laser.ipynb
 
