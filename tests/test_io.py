@@ -1,6 +1,7 @@
 import pathlib
 import unittest
 
+import h5py
 import numpy as np
 from pivmetalib.pivmeta import LaserModel
 
@@ -81,7 +82,51 @@ class TestIO(unittest.TestCase):
 
         pathlib.Path('particles.json').unlink(missing_ok=True)
 
-        # self.filenames.append('particles.json')
-        # metawrite(filename='particles.json',
-        #           metadata=dict(particles=particles),
-        #           format='json')
+    def test_write_hdf(self):
+        cam = Camera(
+            nx=16,
+            ny=16,
+            bit_depth=16,
+            qe=1,
+            sensitivity=1,
+            baseline_noise=50,
+            dark_noise=10,
+            shot_noise=False,
+            fill_ratio_x=1.0,
+            fill_ratio_y=1.0,
+            sigmax=1,
+            sigmay=1,
+            particle_image_diameter=2,
+        )
+        laser = synpivimage.Laser(
+            width=1,
+            shape_factor=1
+        )
+        particles = Particles(
+            x=np.random.uniform(-5, cam.nx - 1, 40),
+            y=np.random.uniform(-10, cam.ny - 1, 40),
+            z=np.random.uniform(-1, 1, 40),
+            size=np.ones(40) * 2,
+        )
+        img, _ = synpivimage.take_image(laser=laser,
+                                        camera=cam,
+                                        particles=particles,
+                                        particle_peak_count=1000)
+
+        with synpivimage.HDF5Writer(__this_dir__ / 'data.hdf',
+                                    particle_dataset_name='img',
+                                    overwrite=True,
+                                    camera=cam) as h5:
+            h5.writeA(imgA=img)
+            h5.writeA(imgA=img)
+
+        with h5py.File(__this_dir__ / 'data.hdf', 'r') as h5:
+            self.assertEqual(h5['img_A'].shape, (2, 16, 16))
+            self.assertEqual(h5['img_A'].dtype, np.uint16)
+            self.assertEqual(h5['image_index'].shape, (2,))
+            self.assertEqual(h5['nx'].shape, (cam.nx,))
+            self.assertEqual(h5['ny'].shape, (cam.ny,))
+            self.assertEqual(h5['image_index'][0], 0)
+            self.assertEqual(h5['image_index'][1], 1)
+            np.testing.assert_array_equal(h5['nx'][()], np.arange(cam.nx))
+            np.testing.assert_array_equal(h5['ny'][()], np.arange(cam.ny))

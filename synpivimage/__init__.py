@@ -4,7 +4,7 @@ import pathlib
 from ._version import __version__
 from .camera import Camera
 from .core import take_image
-from .io import Imwriter
+from .io import Imwriter, HDF5Writer
 from .laser import Laser
 from .particles import Particles
 
