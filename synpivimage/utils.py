@@ -58,7 +58,7 @@ def generate_particles(ppp: float,
         # print(f'curr ppp: {curr_ppp:.5f}')
         diff_ppp = ppp - curr_ppp
         # print(f'diff ppp: {diff_ppp:.5f}')
-        Nadd = int(diff_ppp * camera.size)
+        Nadd = int(0.9 * diff_ppp * camera.size)  # dampen the addition by 10%
 
         if Nadd == 0:
             logger.debug(' > Stopping early because no new particles to be added')
@@ -68,7 +68,6 @@ def generate_particles(ppp: float,
         logger.debug(f' {curr_ppp:.5f}  |  {diff_ppp:.5f}   --> adding {Nadd} particles')
         N += Nadd
         err = abs((curr_ppp - ppp) / ppp)
-        # print(f'rel diff in ppp: {rel_diff:.5f}')
 
         if err < 0.01:
             logger.debug(f' Convergence crit reached')

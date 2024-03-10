@@ -1,0 +1,133 @@
+{
+    "@context": {
+        "owl": "http://www.w3.org/2002/07/owl#",
+        "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
+        "local": "http://example.org/",
+        "m4i": "http://w3id.org/nfdi4ing/metadata4ing#",
+        "pivmeta": "https://matthiasprobst.github.io/pivmeta#",
+        "codemeta": "https://codemeta.github.io/terms/",
+        "@import": "https://raw.githubusercontent.com/matthiasprobst/pivmeta/main/pivmeta_context.jsonld"
+    },
+    "@type": "pivmeta:DigitalCameraModel",
+    "m4i:hasParameter": [
+        {
+            "@type": "m4i:NumericalVariable",
+            "rdfs:label": "nx",
+            "m4i:hasNumericalValue": "128",
+            "m4i:hasUnit": "http://qudt.org/vocab/unit/UNITLESS",
+            "m4i:hasKindOfQuantity": "http://qudt.org/vocab/quantitykind/Dimensionless",
+            "pivmeta:hasStandardName": "https://matthiasprobst.github.io/pivmeta#sensor_pixel_width",
+            "@id": "local:b8b3747d-c616-425f-9982-9b9a500f140b"
+        },
+        {
+            "@type": "m4i:NumericalVariable",
+            "rdfs:label": "ny",
+            "m4i:hasNumericalValue": "128",
+            "m4i:hasUnit": "http://qudt.org/vocab/unit/UNITLESS",
+            "m4i:hasKindOfQuantity": "http://qudt.org/vocab/quantitykind/Dimensionless",
+            "pivmeta:hasStandardName": "https://matthiasprobst.github.io/pivmeta#sensor_pixel_height",
+            "@id": "local:f72a97ce-d03f-4e4a-bb2b-054b08da54ef"
+        },
+        {
+            "@type": "m4i:NumericalVariable",
+            "rdfs:label": "bit_depth",
+            "m4i:hasNumericalValue": "16",
+            "m4i:hasUnit": "http://qudt.org/vocab/unit/BIT",
+            "m4i:hasKindOfQuantity": "http://qudt.org/vocab/quantitykind/InformationEntropy",
+            "@id": "local:887aee9d-44ed-4e13-a1a6-6d3d8447160a"
+        },
+        {
+            "@type": "m4i:NumericalVariable",
+            "rdfs:label": "qe",
+            "m4i:hasVariableDescription": "quantum efficiency",
+            "m4i:hasNumericalValue": "1.0",
+            "@id": "local:d3291c14-4c83-4127-8bec-e892763e4c27"
+        },
+        {
+            "@type": "m4i:NumericalVariable",
+            "rdfs:label": "sensitivity",
+            "m4i:hasNumericalValue": "1.0",
+            "@id": "local:e3f2744c-3d16-49ec-ba96-57afced39607"
+        },
+        {
+            "@type": "m4i:NumericalVariable",
+            "rdfs:label": "baseline_noise",
+            "m4i:hasVariableDescription": "Dark noise is the mean value of a gaussian noise model",
+            "m4i:hasNumericalValue": "0.0",
+            "@id": "local:b5bb37c5-8c65-475a-88ba-078da55b04c4"
+        },
+        {
+            "@type": "m4i:NumericalVariable",
+            "rdfs:label": "dark_noise",
+            "m4i:hasVariableDescription": "Dark noise is the standard deviation of a gaussian noise model",
+            "m4i:hasNumericalValue": "0.0",
+            "@id": "local:628003bb-4d9c-4939-8d47-999104504368"
+        },
+        {
+            "@type": "m4i:NumericalVariable",
+            "rdfs:label": "fill_ratio_x",
+            "m4i:hasNumericalValue": "1.0",
+            "pivmeta:hasStandardName": "https://matthiasprobst.github.io/pivmeta#sensor_pixel_width_fill_factor",
+            "@id": "local:7c631372-9a7e-4246-9c1c-468c0af1d1fa"
+        },
+        {
+            "@type": "m4i:NumericalVariable",
+            "rdfs:label": "fill_ratio_y",
+            "m4i:hasNumericalValue": "1.0",
+            "pivmeta:hasStandardName": "https://matthiasprobst.github.io/pivmeta#sensor_pixel_height_fill_factor",
+            "@id": "local:7888ce26-c739-4cf4-9950-0c546a65ff2c"
+        },
+        {
+            "@type": "m4i:NumericalVariable",
+            "rdfs:label": "particle_image_diameter",
+            "m4i:hasNumericalValue": "1.0",
+            "pivmeta:hasStandardName": "https://matthiasprobst.github.io/pivmeta#image_particle_diameter",
+            "@id": "local:a10ca42d-912a-4013-93f4-09a1ef735e00"
+        },
+        {
+            "@type": "m4i:TextVariable",
+            "rdfs:label": "shot_noise",
+            "m4i:hasStringValue": "false",
+            "@id": "local:9c53ad1d-1ee6-49a2-bb47-2ffafdfe7137"
+        }
+    ],
+    "codemeta:hasSourceCode": {
+        "@type": "SoftwareSourceCode",
+        "schema:author": [
+            {
+                "@type": "Person",
+                "schema:affiliation": {
+                    "@type": "Organization",
+                    "foaf:name": "Karlsruhe Institute of Technology, Institute of Thermal Turbomachinery",
+                    "@id": "local:3bbfad53-c4cb-45ba-a329-d43378552eed"
+                },
+                "@id": "local:f0aeaf21-92ef-483a-8a93-16a46fa3a99a",
+                "givenName": "Matthias",
+                "familyName": "Probst",
+                "email": "matthias.probst@kit.edu"
+            }
+        ],
+        "schema:codeRepository": "https://github.com/MatthiasProbst/synpivimage",
+        "@context": "https://doi.org/10.5063/schema/codemeta-2.0",
+        "license": "https://spdx.org/licenses/MIT",
+        "name": "synpivimage",
+        "version": "1.0.0",
+        "description": "Tool to build synthetic Particle Image Velocimetry (PIV) images",
+        "applicationCategory": "Engineering",
+        "programmingLanguage": [
+            "Python 3",
+            "Python 3.8",
+            "Python 3.9",
+            "Python 3.10",
+            "Python 3.11",
+            "Python 3.12"
+        ],
+        "operatingSystem": [
+            "Linux",
+            "Windows",
+            "macOS"
+        ],
+        "@id": "local:e989404b-770f-4977-8585-bcf2feab1182"
+    },
+    "@id": "local:00521c62-a16b-45c8-a336-d3ba6dbcd18f"
+}

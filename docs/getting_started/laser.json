@@ -1,0 +1,72 @@
+{
+    "@context": {
+        "owl": "http://www.w3.org/2002/07/owl#",
+        "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
+        "local": "http://example.org/",
+        "m4i": "http://w3id.org/nfdi4ing/metadata4ing#",
+        "pivmeta": "https://matthiasprobst.github.io/pivmeta#",
+        "codemeta": "https://codemeta.github.io/terms/"
+    },
+    "@type": "pivmeta:LaserModel",
+    "m4i:hasParameter": [
+        {
+            "@type": "m4i:NumericalVariable",
+            "rdfs:label": "width",
+            "m4i:hasVariableDescription": "Laser width",
+            "m4i:hasNumericalValue": "1.4",
+            "m4i:hasUnit": "mm",
+            "m4i:hasKindOfQuantity": "http://qudt.org/vocab/unit/MilliM",
+            "pivmeta:hasStandardName": "https://matthiasprobst.github.io/pivmeta#model_laser_sheet_thickness",
+            "@id": "local:1c03c67d-2508-499f-bf2a-19e8de385c31"
+        },
+        {
+            "@type": "m4i:NumericalVariable",
+            "rdfs:label": "shape_factor",
+            "m4i:hasVariableDescription": "The shape factor describes they laser beam shape. A value of 1 describes Gaussian beam shape. High value are top-hat-like shapes.",
+            "m4i:hasNumericalValue": "2",
+            "m4i:hasUnit": "",
+            "m4i:hasKindOfQuantity": "https://qudt.org/schema/qudt/DimensionlessUnit",
+            "pivmeta:hasStandardName": "https://matthiasprobst.github.io/pivmeta#model_laser_sheet_shape_factor",
+            "@id": "local:b46c0b4f-c140-4864-8aec-7c9761c57e1b"
+        }
+    ],
+    "codemeta:hasSourceCode": {
+        "@type": "SoftwareSourceCode",
+        "schema:author": [
+            {
+                "@type": "Person",
+                "schema:affiliation": {
+                    "@type": "Organization",
+                    "foaf:name": "Karlsruhe Institute of Technology, Institute of Thermal Turbomachinery",
+                    "@id": "local:86b6f83a-f1f7-4840-b19c-ed50c4943a96"
+                },
+                "@id": "local:c7092e36-23cc-4837-a0fb-31d28d50c9cd",
+                "givenName": "Matthias",
+                "familyName": "Probst",
+                "email": "matthias.probst@kit.edu"
+            }
+        ],
+        "schema:codeRepository": "https://github.com/MatthiasProbst/synpivimage",
+        "@context": "https://doi.org/10.5063/schema/codemeta-2.0",
+        "license": "https://spdx.org/licenses/MIT",
+        "name": "synpivimage",
+        "version": "1.0.0",
+        "description": "Tool to build synthetic Particle Image Velocimetry (PIV) images",
+        "applicationCategory": "Engineering",
+        "programmingLanguage": [
+            "Python 3",
+            "Python 3.8",
+            "Python 3.9",
+            "Python 3.10",
+            "Python 3.11",
+            "Python 3.12"
+        ],
+        "operatingSystem": [
+            "Linux",
+            "Windows",
+            "macOS"
+        ],
+        "@id": "local:f16f4f68-c09c-4c7a-a21c-3c6b2ef3cd79"
+    },
+    "@id": "local:e035ba3a-3641-4832-acf1-5bdcf671a50f"
+}
