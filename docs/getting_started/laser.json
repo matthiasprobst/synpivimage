@@ -17,7 +17,7 @@
             "m4i:hasUnit": "mm",
             "m4i:hasKindOfQuantity": "http://qudt.org/vocab/unit/MilliM",
             "pivmeta:hasStandardName": "https://matthiasprobst.github.io/pivmeta#model_laser_sheet_thickness",
-            "@id": "local:1c03c67d-2508-499f-bf2a-19e8de385c31"
+            "@id": "local:b0edee9b-d8a6-4542-ab16-93bb99c1ca8b"
         },
         {
             "@type": "m4i:NumericalVariable",
@@ -27,7 +27,7 @@
             "m4i:hasUnit": "",
             "m4i:hasKindOfQuantity": "https://qudt.org/schema/qudt/DimensionlessUnit",
             "pivmeta:hasStandardName": "https://matthiasprobst.github.io/pivmeta#model_laser_sheet_shape_factor",
-            "@id": "local:b46c0b4f-c140-4864-8aec-7c9761c57e1b"
+            "@id": "local:26414db3-e79f-4fa7-aca7-3f159a48f3f2"
         }
     ],
     "codemeta:hasSourceCode": {
@@ -38,9 +38,9 @@
                 "schema:affiliation": {
                     "@type": "Organization",
                     "foaf:name": "Karlsruhe Institute of Technology, Institute of Thermal Turbomachinery",
-                    "@id": "local:86b6f83a-f1f7-4840-b19c-ed50c4943a96"
+                    "@id": "local:b93f863a-c503-4c7d-a7f3-7ae0a3329289"
                 },
-                "@id": "local:c7092e36-23cc-4837-a0fb-31d28d50c9cd",
+                "@id": "local:4105bc9a-beed-42f3-8922-0925a03f19f3",
                 "givenName": "Matthias",
                 "familyName": "Probst",
                 "email": "matthias.probst@kit.edu"
@@ -66,7 +66,7 @@
             "Windows",
             "macOS"
         ],
-        "@id": "local:f16f4f68-c09c-4c7a-a21c-3c6b2ef3cd79"
+        "@id": "local:93c51e36-c5d1-4a45-938d-ee7dff3b2499"
     },
-    "@id": "local:e035ba3a-3641-4832-acf1-5bdcf671a50f"
+    "@id": "local:ef47b12c-b7a8-4720-8f77-20e99edb752f"
 }

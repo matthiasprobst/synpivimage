@@ -249,7 +249,7 @@ class HDF5Writer:
             The filename of the HDF5 file
 
         """
-        self.filename = filename
+        self.filename = pathlib.Path(filename)
         self.image_dataset_name = image_dataset_name
         self.particle_dataset_name = particle_dataset_name
         self.overwrite = overwrite

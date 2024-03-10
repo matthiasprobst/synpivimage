@@ -10,3 +10,4 @@ sphinx-design
 myst-nb
 nbsphinx
 sphinxcontrib-bibtex
+h5rdmtoolbox @ git+https://github.com/matthiasprobst/h5RDMtoolbox@dev-jsonld

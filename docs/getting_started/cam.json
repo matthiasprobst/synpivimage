@@ -17,7 +17,7 @@
             "m4i:hasUnit": "http://qudt.org/vocab/unit/UNITLESS",
             "m4i:hasKindOfQuantity": "http://qudt.org/vocab/quantitykind/Dimensionless",
             "pivmeta:hasStandardName": "https://matthiasprobst.github.io/pivmeta#sensor_pixel_width",
-            "@id": "local:b8b3747d-c616-425f-9982-9b9a500f140b"
+            "@id": "local:da1e91ff-1133-4ac3-a2d2-5a2ae5930f9a"
         },
         {
             "@type": "m4i:NumericalVariable",
@@ -26,7 +26,7 @@
             "m4i:hasUnit": "http://qudt.org/vocab/unit/UNITLESS",
             "m4i:hasKindOfQuantity": "http://qudt.org/vocab/quantitykind/Dimensionless",
             "pivmeta:hasStandardName": "https://matthiasprobst.github.io/pivmeta#sensor_pixel_height",
-            "@id": "local:f72a97ce-d03f-4e4a-bb2b-054b08da54ef"
+            "@id": "local:51c581b1-f37d-48cc-a62a-ff77878bb3bc"
         },
         {
             "@type": "m4i:NumericalVariable",
@@ -34,61 +34,61 @@
             "m4i:hasNumericalValue": "16",
             "m4i:hasUnit": "http://qudt.org/vocab/unit/BIT",
             "m4i:hasKindOfQuantity": "http://qudt.org/vocab/quantitykind/InformationEntropy",
-            "@id": "local:887aee9d-44ed-4e13-a1a6-6d3d8447160a"
+            "@id": "local:42575537-edef-41a6-8f3a-c7f3c8a2cb3e"
         },
         {
             "@type": "m4i:NumericalVariable",
             "rdfs:label": "qe",
             "m4i:hasVariableDescription": "quantum efficiency",
             "m4i:hasNumericalValue": "1.0",
-            "@id": "local:d3291c14-4c83-4127-8bec-e892763e4c27"
+            "@id": "local:a9352d4b-3a24-4ed2-9fd9-ebc6c81296f6"
         },
         {
             "@type": "m4i:NumericalVariable",
             "rdfs:label": "sensitivity",
             "m4i:hasNumericalValue": "1.0",
-            "@id": "local:e3f2744c-3d16-49ec-ba96-57afced39607"
+            "@id": "local:7f6ca733-ce47-4fd8-a8ec-2b555389ace1"
         },
         {
             "@type": "m4i:NumericalVariable",
             "rdfs:label": "baseline_noise",
             "m4i:hasVariableDescription": "Dark noise is the mean value of a gaussian noise model",
             "m4i:hasNumericalValue": "0.0",
-            "@id": "local:b5bb37c5-8c65-475a-88ba-078da55b04c4"
+            "@id": "local:6ec0d5fa-ea8a-4fd3-a744-e1029ae1f308"
         },
         {
             "@type": "m4i:NumericalVariable",
             "rdfs:label": "dark_noise",
             "m4i:hasVariableDescription": "Dark noise is the standard deviation of a gaussian noise model",
             "m4i:hasNumericalValue": "0.0",
-            "@id": "local:628003bb-4d9c-4939-8d47-999104504368"
+            "@id": "local:59d4d3e7-778f-468d-ad94-e921cb7386ce"
         },
         {
             "@type": "m4i:NumericalVariable",
             "rdfs:label": "fill_ratio_x",
             "m4i:hasNumericalValue": "1.0",
             "pivmeta:hasStandardName": "https://matthiasprobst.github.io/pivmeta#sensor_pixel_width_fill_factor",
-            "@id": "local:7c631372-9a7e-4246-9c1c-468c0af1d1fa"
+            "@id": "local:0154bc43-e5e9-4b7c-a5cc-060f5a01b3c3"
         },
         {
             "@type": "m4i:NumericalVariable",
             "rdfs:label": "fill_ratio_y",
             "m4i:hasNumericalValue": "1.0",
             "pivmeta:hasStandardName": "https://matthiasprobst.github.io/pivmeta#sensor_pixel_height_fill_factor",
-            "@id": "local:7888ce26-c739-4cf4-9950-0c546a65ff2c"
+            "@id": "local:2940ccba-6995-47da-9959-01bc81c49354"
         },
         {
             "@type": "m4i:NumericalVariable",
             "rdfs:label": "particle_image_diameter",
             "m4i:hasNumericalValue": "1.0",
             "pivmeta:hasStandardName": "https://matthiasprobst.github.io/pivmeta#image_particle_diameter",
-            "@id": "local:a10ca42d-912a-4013-93f4-09a1ef735e00"
+            "@id": "local:14bfc730-336e-4c91-b0a7-a706ccb325f5"
         },
         {
             "@type": "m4i:TextVariable",
             "rdfs:label": "shot_noise",
             "m4i:hasStringValue": "false",
-            "@id": "local:9c53ad1d-1ee6-49a2-bb47-2ffafdfe7137"
+            "@id": "local:741ab982-2e24-4e7d-bbe7-e87aed64e4d0"
         }
     ],
     "codemeta:hasSourceCode": {
@@ -99,9 +99,9 @@
                 "schema:affiliation": {
                     "@type": "Organization",
                     "foaf:name": "Karlsruhe Institute of Technology, Institute of Thermal Turbomachinery",
-                    "@id": "local:3bbfad53-c4cb-45ba-a329-d43378552eed"
+                    "@id": "local:35b29afe-e6dd-4aad-a279-2ea02ca8660e"
                 },
-                "@id": "local:f0aeaf21-92ef-483a-8a93-16a46fa3a99a",
+                "@id": "local:d2bf0faa-1ba9-4594-998a-814d157be2df",
                 "givenName": "Matthias",
                 "familyName": "Probst",
                 "email": "matthias.probst@kit.edu"
@@ -127,7 +127,7 @@
             "Windows",
             "macOS"
         ],
-        "@id": "local:e989404b-770f-4977-8585-bcf2feab1182"
+        "@id": "local:5809227c-b206-4fa2-a412-d56668bebc31"
     },
-    "@id": "local:00521c62-a16b-45c8-a336-d3ba6dbcd18f"
+    "@id": "local:9bb6dda8-00b9-4761-89fa-262d5d93ed7a"
 }
