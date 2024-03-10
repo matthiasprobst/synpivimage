@@ -1,134 +1,79 @@
-# synpivimage
-
+# synpivimage - A transparent way of generating synthetic PIV images
 
 ![Tests](https://github.com/matthiasprobst/synpivimage/actions/workflows/tests.yml/badge.svg)
 ![DOCS](https://codecov.io/gh/matthiasprobst/synpivimage/branch/dev/graph/badge.svg)
 ![pyvers](https://img.shields.io/badge/python-3.8%20%7C%203.9%20%7C%203.10%20%7C%203.11%20%7C%203.12-blue)
 
-Tool to build synthetic Particle Image Velocimetry (PIV) images based on commonly accepted literature.
+This tool let's you generate synthetic Particle Image Velocimetry (PIV) images based on methods described in
+literature (mainly based on "Particle Image Velocimetry: A Practical Guide" by Raffel et
+al. (https://doi.org/10.1007/978-3-319-68852-7)).
 
-It uses the commonly used assumptions and DOES NOT include optical aberrations, such as lens distortion or such. Noise
-can be added and particles can be moved, to create a synthetic A-B-image pair.
+## Highlights
 
-A GUI helps to investigate the effect of the parameters on the image(s).
-
-**Note, that this package is still under development and the API might change.**
-
-The image particles density distribution is modelled as described in the Book "Particle Image Velocimetry: A Practical
-Guide" by Raffel et al. (https://doi.org/10.1007/978-3-319-68852-7).
-
-The effective sensor count is computed as follows:
-
-counts = (RLI x 2**BIT + NOISE ) x QE
-
-- RLI: relative laser intensity; value range: (0 , 1]
-- BIT: bit depth of camera, e.g. 8 or 16 (RLI x 2**BIT gives the maximum number of photons emitted by a particle)
-- NOISE: noise (in number of photons)
-- QE: quantum efficiency (conversion efficiency of photons to electrons)
-- counts: number of electrons = counts on the sensor = image intensity
-
-For *no noise* and RLI=1 a particle will be seen with maximal pixel count in the image. This means, that a slight
-overlap will saturate the camera. Therefore the VLI should be < 1
-
-## Noise note:
-
-A particle peak intensity one the sensor, which is below 3 times sigma_{noise} will be flagged as non existing due to
-too weak illumination.
+- The user has full control over the parameters.
+- Data and metadata can be stored in a single HDF5 file or classically in TIF files.
+- The metadata (camera and laser settings) can be stored in a separate JSON-LD file, which adheres to the state of the
+  art way of storing metadata, allowing for easy integration into any other software or database.
 
 ## Installation
 
 Navigate to the repository folder and run
 
 ```bash
-pip install .
+pip install synpivimage
 ```
 
-To use the package during development, install it accordingly:
+## Documentation
 
-```bash
-pip install -e .
-```
+A comprehensive documentation can be found [here](https://synpivimage.readthedocs.io/en/latest/).
 
-To install `pytest` in order to run test optional dependencies must be installed:
-
-```bash
-pip install -e ".[test]"
-```
-
-Then, execute `pytest` in the repository directory:
-
-```bash
-pytest
-```
-
-## Quick introduction
-
-To generate synthetic particle images, configure a `ConfigManager`. It take the parameters and take care of generating
-and writing the data to an `HDF5` file. For more explanation follow the
-example `jupyter notebook` [here](./examples/generate_datasets.ipynb).
-
-### Simple A-B-image generation:
+### Minimal example:
 
 ```python
+import numpy as np
 
+import synpivimage
 
-import synpivimage as spi
-
-# load the default config dictionary:
-cfg = spi.get_default()
-
-# manipulated some parameters:
-cfg.bit_depth = 8
-cfg.nx = 31
-cfg.ny = 31
-cfg.particle_size_std = 1
-
-# Set up the dictionary with variable ranges that will be varied:
-image_size = cfg.nx * cfg.ny
-
-from synpivimage import generate_image
-
-imgA, attrsA, part_infoA = generate_image(
-    cfg,
-    particle_data=None
+cam = synpivimage.Camera(
+    nx=256,
+    ny=256,
+    bit_depth=16,
+    qe=1,
+    sensitivity=1,
+    baseline_noise=50,
+    dark_noise=10,
+    shot_noise=False,
+    fill_ratio_x=1.0,
+    fill_ratio_y=1.0,
+    particle_image_diameter=4  # px
 )
 
-# displace the particles (here a random displacement)
-# We need to use the special class to displace the particles as it will 
-# take care of new particles moving into the laser light sheet
-from synpivimage import velocityfield
-
-cfield = velocityfield.ConstantField(dx=2.3, dy=1.6, dz=0)
-displaced_particle_data = cfield.displace(cfg=cfg, part_info=part_infoA)
-
-imgB, attrsB, part_infoB = generate_image(
-    cfg,
-    particle_data=displaced_particle_data
+laser = synpivimage.Laser(
+    width=0.25,
+    shape_factor=2
 )
 
-from synpivimage import io
+n = 100
+particles = synpivimage.Particles(
+    x=np.random.uniform(-3, cam.nx - 1, n),
+    y=np.random.uniform(-4, cam.ny - 1, n),
+    z=np.zeros(n),
+    size=np.ones(n) * 2,
+)
 
-io.imwrite8('img8_A.tif', imgA)
-io.imwrite8('img8_B.tif', imgB)
-```
+imgA, partA = synpivimage.take_image(laser,
+                                     cam,
+                                     particles,
+                                     particle_peak_count=1000)
 
-### Varying multiple parameters at once:
+displaced_particles = partA.displace(dx=2.1, dy=3.4)
 
-```python
+imgB, partB = synpivimage.take_image(laser,
+                                     cam,
+                                     displaced_particles,
+                                     particle_peak_count=1000)
 
-variation_dict = {'particle_number': np.arange(1, image_size * 0.1, 20).astype(int),
-                  'particle_size_mean': (2, 3),
-                  'laser_shape_factor': (1, 10)}
-
-# init the config manager:
-CFGs = spi.ConfigManager.from_variation_dict(initial_cfg=cfg,
-                                             variation_dict=variation_dict,
-                                             per_combination=3,
-                                             shuffle=True)
-
-# generate the images and store them in HDF5:
-hdf_filename = CFGs.generate(data_directory='example_data_dir',
-                             nproc=4, n_split=1000, overwrite=True)
+with 
 ```
 
 ## Testing
@@ -138,3 +83,11 @@ Call the following inside the package directory to run the tests (with coverage)
 ```bash
 pytest --cov=synpivimage --cov-report html
 ```
+
+## Contributing
+
+Contributions are welcome! Please open an issue or a pull request.
+
+## License
+
+This project is licensed under the MIT License.

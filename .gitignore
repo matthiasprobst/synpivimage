@@ -50,3 +50,12 @@ examples/*.tif
 examples/double_img
 examples/single_img
 *.bak
+docs/getting_started/double_images/imgs/*
+docs/getting_started/double_images/particles/*
+docs/getting_started/double_images/*.json
+docs/getting_started/single_img/imgs/*
+docs/getting_started/single_img/particles/*
+docs/getting_started/single_img/*.json
+docs/jupyter_execute
+docs/generated
+docs/_build/*

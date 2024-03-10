@@ -1,18 +1,19 @@
 """Core module"""
 import logging
 import multiprocessing as mp
-import numpy as np
 import pathlib
 import time
-from pivimage import PIVImage
 from typing import Tuple
+
+import numpy as np
 
 from .camera import Camera
 from .laser import Laser
 from .particles import Particles, compute_intensity_distribution, ParticleFlag
 
 LOGGER = logging.getLogger('synpivimage')
-COUNT_EDGE_PARTICLES = False
+COUNT_EDGE_PARTICLES = True  # an edge particle has its center at the border of the image. If False, the particle
+# has to be at least half its size away from the border to be considered.
 NSIGMA_NOISE_THRESHOLD = 4  # 4*dark_noise=4*sigma_dark_noise should be the threshold for the particle intensity.
 # if the peak intensity is below that, the particle is considered not be have an influence on the cross correlation.
 SQRT2 = np.sqrt(2)
@@ -24,10 +25,10 @@ CPU_COUNT = mp.cpu_count()
 
 
 def take_image(laser: Laser,
-               cam: Camera,
+               camera: Camera,
                particles: Particles,
                particle_peak_count: int,
-               **kwargs) -> Tuple[PIVImage, Particles]:
+               **kwargs) -> Tuple[np.ndarray, Particles]:
     """Takes an image of the particles
 
     1. Illuminates the particles (Note, that particles may lay outside the laser width! The
@@ -39,7 +40,7 @@ def take_image(laser: Laser,
     ----------
     laser : Laser
         The laser object containing the laser parameters
-    cam : Camera
+    camera : Camera
         The camera object containing the camera parameters
     particles : Particles
         The particles to be imaged
@@ -58,16 +59,16 @@ def take_image(laser: Laser,
         xp=0,
         yp=0,
         dp=mean_particle_size,
-        sigmax=cam.particle_image_diameter / 4,
-        sigmay=cam.particle_image_diameter / 4,
-        fill_ratio_x=cam.fill_ratio_x,
-        fill_ratio_y=cam.fill_ratio_y
+        sigmax=camera.particle_image_diameter / 4,
+        sigmay=camera.particle_image_diameter / 4,
+        fill_ratio_x=camera.fill_ratio_x,
+        fill_ratio_y=camera.fill_ratio_y
     )
-    intensity_factor = (particle_peak_count + 1) / max_part_intensity / cam.qe / cam.sensitivity
+    intensity_factor = (particle_peak_count + 1) / max_part_intensity / camera.qe / camera.sensitivity
     # assert int(intensity_factor * max_part_intensity) == 1000
 
     # compute the noise level:
-    if cam.shot_noise:
+    if camera.shot_noise:
         sqrtN = np.sqrt(max_part_intensity * intensity_factor)
     else:
         sqrtN = 0
@@ -77,15 +78,17 @@ def take_image(laser: Laser,
     assert np.min(particles.source_intensity) >= 0
     assert np.max(particles.source_intensity) <= 1
 
-    hips = cam.particle_image_diameter / 2  # half image particle size
+    hips = camera.particle_image_diameter / 2  # half image particle size
     if COUNT_EDGE_PARTICLES:
         """An edge particle has its center at the border of the image"""
-        xflag = np.logical_and(-hips < particles.x, particles.x + hips < cam.nx - 1)
-        yflag = np.logical_and(-hips < particles.y, particles.y + hips < cam.ny - 1)
+        xflag = np.logical_and(0 <= particles.x, particles.x < camera.nx)
+        yflag = np.logical_and(0 <= particles.y, particles.y < camera.ny)
+        # xflag = np.logical_and(-hips < particles.x, particles.x < camera.nx - 1 + hips)
+        # yflag = np.logical_and(-hips < particles.y, particles.y < camera.ny - 1 + hips)
     else:
         # particles with half their size away from the border are considered
-        xflag = np.logical_and(hips < particles.x, particles.x + hips < cam.nx - 1)
-        yflag = np.logical_and(hips < particles.y, particles.y + hips < cam.ny - 1)
+        xflag = np.logical_and(hips < particles.x, particles.x + hips < camera.nx - 1)
+        yflag = np.logical_and(hips < particles.y, particles.y + hips < camera.ny - 1)
 
     # these particles are active/illuminated
     in_fov = xflag & yflag
@@ -95,7 +98,7 @@ def take_image(laser: Laser,
     # the dark noise should not be greater that the particle intensity, otherwise the particle will not be visible
     # the total particle intensity is the baseline noise + the particle intensity + the shot noise (if enabled)
     # + the dark noise.
-    illumination_threshold = max(NSIGMA_NOISE_THRESHOLD * cam.dark_noise + sqrtN, np.exp(-2) * particle_peak_count)
+    illumination_threshold = max(NSIGMA_NOISE_THRESHOLD * camera.dark_noise + sqrtN, np.exp(-2) * particle_peak_count)
     weakly_illuminated = particles.source_intensity * particle_peak_count <= illumination_threshold
     # disable the particles due to weak illumination (mark only IN-FOV-particles like this!):
     particles.flag[weakly_illuminated] += ParticleFlag.OUT_OF_PLANE.value
@@ -120,12 +123,12 @@ def take_image(laser: Laser,
     # capture the image
     logger.debug('Capturing the image...')
     st = time.time()
-    img, n_saturated = cam.take_image(particles)
+    img, n_saturated = camera.take_image(particles)
     et = time.time() - st
     logger.debug(f'...took: {et} s')
 
     n_valid = np.sum(particles.flag)
     logger.debug(f'valid particles: {n_valid}:')
-    logger.debug(f'ppp={n_valid / (cam.ny * cam.nx):.4f}')
+    logger.debug(f'ppp={n_valid / (camera.ny * camera.nx):.4f}')
 
-    return PIVImage.from_array(np.asarray(img)), particles
+    return img, particles

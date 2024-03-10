@@ -34,19 +34,29 @@ class Component(abc.ABC):
     def save_jsonld(self, filename: Union[str, pathlib.Path]) -> pathlib.Path:
         """Save the component to JSON"""
 
-    # @classmethod
-    # def load(cls, filename: Union[str, pathlib.Path]):
-    #     """Load the component from JSON"""
-    #     filename = pathlib.Path(filename).with_suffix('.json')
-    #     with open(filename) as f:
-    #         data = json.load(f)
-    #     return cls(**data)
+    @classmethod
+    @abc.abstractmethod
+    def load_jsonld(cls, filename: Union[str, pathlib.Path]):
+        """Load the component from JSON-LD"""
 
 
-# def save_multiple(components: List[Component],
-#                   filename: Union[str, pathlib.Path]):
-#     """Saves multiple components into a single file"""
-#     filename = pathlib.Path(filename).with_suffix('.json')
-#     with open(filename, 'w') as f:
-#         for component in components:
-#             json.dump(component.model_dump(), f, indent=4)
+def load_jsonld(cls, iri, filename) -> List[Component]:
+    """Load the component from JSON-LD"""
+    filename = pathlib.Path(filename)
+    import ontolutils
+    data = ontolutils.dquery(
+        iri,
+        filename,
+        context={'pivmeta': 'https://matthiasprobst.github.io/pivmeta#'}
+    )
+    if data is None:
+        raise ValueError(f"Could not load camera from {filename}.")
+
+    components = []
+    for d in data:
+        components.append(
+            cls(**{p['label']: p.get('hasNumericalValue', p.get('hasStringValue', None)) for p in
+                   d['hasParameter']})
+        )
+
+    return components

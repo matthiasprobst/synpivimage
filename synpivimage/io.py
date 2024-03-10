@@ -188,10 +188,12 @@ class Imwriter:
         self._img_idx = 0
         return self
 
-    def write(self, img: np.ndarray, ab: Literal['A', 'B'], particles: Particles = None):
-        print(f'writing {ab} image')
+    def write(self, img: np.ndarray, ab: Optional[Literal['A', 'B']] = None, particles: Particles = None):
+        """Write an image to a file. Calls cv2.imwrite."""
         if not self._enabled:
             raise ValueError('Imwriter is not enabled')
+        if ab is None:
+            ab = ''
         img_filename = self.image_dir / 'imgs' / f'img_{self._img_idx:06d}{ab}{self.suffix}'
         cv2.imwrite(str(img_filename), np.asarray(img))
 

@@ -20,6 +20,15 @@ for h in logger.handlers:
 
 class TestLaser(unittest.TestCase):
 
+    def test_save_load_camera(self):
+        laser = Laser(
+            width=0.25,
+            shape_factor=2
+        )
+        laser.save_jsonld(__this_dir__ / 'laser.json')
+        laser_loaded = Laser.load_jsonld(__this_dir__ / 'laser.json')[0]
+        self.assertEqual(laser, laser_loaded)
+
     def test_effective_laser_width(self):
         """Test the effective laser width"""
         laser = Laser(
@@ -48,8 +57,38 @@ class TestLaser(unittest.TestCase):
         )
         imgOne, partOne = take_image(laser, cam, many_particles, particle_peak_count=1000)
 
+        ppp = partOne.get_ppp(cam.size)
+        self.assertIsInstance(ppp, float)
+        ppp_ref = partOne.active.sum() / cam.size
+        self.assertAlmostEqual(ppp, ppp_ref, delta=0.01)
+
 
 class TestParticles(unittest.TestCase):
+
+    def test_generate_certain_ppp(self):
+        laser = Laser(shape_factor=10 ** 3, width=10)
+
+        cam = Camera(
+            nx=128,
+            ny=128,
+            bit_depth=16,
+            qe=1,
+            sensitivity=1,
+            baseline_noise=0,
+            dark_noise=0,
+            shot_noise=False,
+            fill_ratio_x=1.0,
+            fill_ratio_y=1.0,
+            particle_image_diameter=2,
+            seed=10
+        )
+        partA = Particles.generate(ppp=0.01,
+                                   dx_max=[100, 100],
+                                   dy_max=[-100, 100],
+                                   dz_max=[1, 1], camera=cam,
+                                   laser=laser)
+        self.assertAlmostEqual(partA.get_ppp(cam.size), 0.01, delta=0.001)
+
     def test_single_particle(self):
         one_particle = Particles(
             x=1,

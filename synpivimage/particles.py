@@ -1,8 +1,10 @@
 import enum
+import logging
 import pathlib
 from copy import deepcopy
 from dataclasses import dataclass
-from typing import Tuple, Union, Dict, Optional, List
+from typing import Tuple
+from typing import Union, Dict, Optional, List
 
 import numpy as np
 import scipy
@@ -11,6 +13,7 @@ from .component import Component
 
 SQRT2 = np.sqrt(2)
 PARTICLE_INFLUENCE_FACTOR = 6
+logger = logging.getLogger('synpivimage')
 
 
 class ParticleFlag(enum.Enum):
@@ -207,6 +210,32 @@ class Particles(Component):
         self._image_electrons = np.zeros_like(self.x)
         self._image_quantized_electrons = np.zeros_like(self.x)
         self._flag = np.zeros_like(self.x, dtype=int)
+
+    @classmethod
+    def generate(cls, ppp: float, dx_max, dy_max, dz_max, camera, laser) -> "Particles":
+        """Generate particles based on a certain ppp (particles per pixel). With
+        dx, dy, dz the maximum displacement of the particles can be set. The camera and laser
+        are used to determine the sensor size and the laser width."""
+        from .utils import generate_particles
+        return generate_particles(ppp=ppp, dx_max=dx_max, dy_max=dy_max, dz_max=dz_max, camera=camera, laser=laser)
+
+    def get_ppp(self, camera_size: int) -> float:
+        """Return the particles per pixel"""
+        return self.active.sum() / camera_size
+
+    def regenerate(self):
+        """Regenerate the particles. The number of particles and hence the ppp will remain constant (within
+        a statistical deviation) but the position and size of the particles will change."""
+        new_part = self.copy()
+        N = len(self.x)
+        x = np.random.uniform(min(self.x), max(self.x), N)
+        y = np.random.uniform(min(self.y), max(self.y), N)
+        z = np.random.uniform(min(self.z), max(self.z), N)
+        new_part._x = x
+        new_part._y = y
+        new_part._z = z
+        new_part.reset()
+        return new_part
 
     def __len__(self):
         return self.x.size
@@ -451,6 +480,9 @@ class Particles(Component):
     def copy(self):
         """Return a copy of this object"""
         return deepcopy(self)
+
+    def load_jsonld(self):
+        raise NotImplementedError("Not implemented yet")
 
 
 def compute_intensity_distribution(

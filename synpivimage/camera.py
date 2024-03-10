@@ -2,11 +2,12 @@ import pathlib
 from typing import Tuple, Union, Optional
 
 import numpy as np
+from ontolutils.namespacelib import QUDT_UNIT, QUDT_KIND
 from pydantic import BaseModel
 from typing_extensions import Annotated
 
 from . import noise
-from .component import Component
+from .component import Component, load_jsonld
 from .particles import Particles, model_image_particles
 from .validation import PositiveInt, PositiveFloat, ValueRange
 
@@ -23,7 +24,7 @@ class Camera(BaseModel, Component):
     sensitivity: Efficiency
     baseline_noise: float
     dark_noise: float
-    shot_noise: float
+    shot_noise: bool
     fill_ratio_x: FillRatio
     fill_ratio_y: FillRatio
     particle_image_diameter: PositiveFloat
@@ -150,14 +151,14 @@ class Camera(BaseModel, Component):
             'baseline_noise': 'Dark noise is the mean value of a gaussian noise model'
         }
         unit_dict = {
-            'nx': '',
-            'ny': '',
-            'bit_depth': 'http://qudt.org/vocab/unit/BIT',
+            'nx': QUDT_UNIT.UNITLESS,
+            'ny': QUDT_UNIT.UNITLESS,
+            'bit_depth': QUDT_UNIT.BIT,  # 'http://qudt.org/vocab/unit/BIT',
         }
         qkind_dict = {
-            'nx': "https://qudt.org/schema/qudt/DimensionlessUnit",
-            'ny': "https://qudt.org/schema/qudt/DimensionlessUnit",
-            'bit_depth': 'http://qudt.org/schema/qudt/CountingUnit'
+            'nx': QUDT_KIND.Dimensionless,
+            'ny': QUDT_KIND.Dimensionless,
+            'bit_depth': QUDT_KIND.InformationEntropy  # 'http://qudt.org/schema/qudt/CountingUnit'
         }
 
         hasParameter = []
@@ -193,3 +194,24 @@ class Camera(BaseModel, Component):
                 )
             )
         return filename
+
+    @classmethod
+    def load_jsonld(cls, filename: Union[str, pathlib.Path]):
+        """Load the camera from a JSON-LD file
+
+        .. note::
+
+            This function will return a list of Camera objects. This may be
+            confusing, but there might be multiple lasers in the JSON file.
+
+        Parameters
+        ----------
+        filename : Union[str, pathlib.Path]
+            The filename to load the component from
+
+        Returns
+        -------
+        List[Camera]
+            List of camera objects
+        """
+        return load_jsonld(cls, 'pivmeta:DigitalCameraModel', filename)

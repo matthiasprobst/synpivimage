@@ -15,6 +15,7 @@ class TestComponents(unittest.TestCase):
         filename = cam.save_json('laser')
         self.assertTrue(filename.exists())
         self.assertEqual(filename.suffix, '.json')
+        filename.unlink(missing_ok=True)
 
     def tearDown(self) -> None:
         """clean up"""

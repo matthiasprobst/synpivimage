@@ -8,7 +8,7 @@ from ontolutils.namespacelib import PIVMETA, QUDT_UNIT
 from pydantic import BaseModel
 
 from .codemeta import get_package_meta
-from .component import Component
+from .component import Component, load_jsonld
 from .particles import Particles
 from .validation import PositiveInt, PositiveFloat
 
@@ -50,18 +50,20 @@ def const(z):
 class Laser(BaseModel, Component):
     """Laser class. This class will be used to illuminate the particles.
 
-    Note, that gaussian distribution is found for shape_factor=1, not =2 as
-    in the literature (which is wrong, e.g. see Raffel et al.)!
-    width is the width of the laser, where the intensity drops to 0.67, i.e.
-    not the effective laser width, with is defined by the noise level or where
-    the intensity drops to e^(-1).
+    .. note::
+
+        The Gaussian distribution is found for shape_factor=1, not =2 as
+        in the literature (which is wrong, e.g. see Raffel et al.)!
+        width is the width of the laser, where the intensity drops to 0.67, i.e.
+        not the effective laser width, with is defined by the noise level or where
+        the intensity drops to e^(-1).
     """
     shape_factor: PositiveInt
     width: PositiveFloat  # width of the laser, not the effective laser width
 
     def illuminate(self,
                    particles: Particles,
-                   **kwargs):
+                   **kwargs) -> Particles:
         """Illuminate the particles. The values will be between 0 and 1.
         Particles outside the laser will be masked.
 
@@ -113,8 +115,19 @@ class Laser(BaseModel, Component):
             plt.show()
         return Particles(**particles.dict())
 
-    def save_jsonld(self, filename: Union[str, pathlib.Path]):
-        """Save the component to JSON"""
+    def save_jsonld(self, filename: Union[str, pathlib.Path]) -> pathlib.Path:
+        """Save the component to JSON.
+
+        Parameters
+        ----------
+        filename : Union[str, pathlib.Path]
+            The filename to save the component to
+
+        Returns
+        -------
+        pathlib.Path
+            The filename the component was saved to
+        """
         try:
             from pivmetalib import pivmeta
         except ImportError:
@@ -126,7 +139,7 @@ class Laser(BaseModel, Component):
                 pivmeta.NumericalVariable(
                     label='width',
                     hasNumericalValue=self.width,
-                    hasStandardName=PIVMETA.laser_sheet_thickness,
+                    hasStandardName=PIVMETA.model_laser_sheet_thickness,
                     hasUnit='mm',
                     hasKindOfQuantity=QUDT_UNIT.MilliM,  # 'https://qudt.org/vocab/unit/MilliM',
                     hasVariableDescription='Laser width'),
@@ -147,6 +160,27 @@ class Laser(BaseModel, Component):
                 laser.model_dump_jsonld(context={'local': 'http://example.org/'})
             )
         return filename
+
+    @classmethod
+    def load_jsonld(cls, filename: Union[str, pathlib.Path]):
+        """Load the Laser from a JSON-LD file
+
+        .. note::
+
+            This function will return a list of Laser objects. This may be
+            confusing, but there might be multiple lasers in the JSON file.
+
+        Parameters
+        ----------
+        filename : Union[str, pathlib.Path]
+            The filename to load the component from
+
+        Returns
+        -------
+        List[Laser]
+            List of laser objects
+        """
+        return load_jsonld(cls, 'pivmeta:LaserModel', filename)
 
 
 class GaussShapeLaser(Laser):
