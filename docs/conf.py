@@ -34,7 +34,7 @@ extensions = ['sphinx.ext.autodoc',
               "IPython.sphinxext.ipython_directive",
               "IPython.sphinxext.ipython_console_highlighting",
               "sphinx_copybutton",
-              # "nbsphinx",
+              "nbsphinx",
               "sphinx_design",
               "myst_nb", ]
 
