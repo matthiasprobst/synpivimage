@@ -32,12 +32,18 @@ class Camera(BaseModel, Component):
 
     @property
     def size(self) -> int:
-        """Size of the sensor in pixels"""
+        """Size of the sensor in pixels (nx x ny)"""
         return int(self.nx * self.ny)
 
     @property
     def max_count(self):
-        """Max count of the sensor"""
+        """Max count of the sensor, which is computed from the
+        bit depth `b` of the sensor.
+
+        .. math
+
+            c_{max} = 2**b -1
+        """
         return int(2 ** self.bit_depth - 1)
 
     def _quantize(self, electrons) -> Tuple[np.ndarray, int]:
