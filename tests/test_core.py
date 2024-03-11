@@ -66,6 +66,55 @@ class TestLaser(unittest.TestCase):
 
 class TestParticles(unittest.TestCase):
 
+    def test_compute_ppp(self):
+        laser = Laser(
+            width=0.25,
+            shape_factor=2
+        )
+        cam = Camera(
+            nx=16,
+            ny=16,
+            bit_depth=16,
+            qe=1,
+            sensitivity=1,
+            baseline_noise=200,
+            dark_noise=100,
+            shot_noise=False,
+            fill_ratio_x=1.0,
+            fill_ratio_y=1.0,
+            particle_image_diameter=1.0
+        )
+        particles = Particles(
+            x=4, y=4, z=0, size=2
+        )
+        imgOne, partOne = take_image(laser, cam, particles, particle_peak_count=1000)
+        self.assertEqual(partOne.get_ppp(camera_size=cam.size), 1 / cam.size)
+
+        particles = Particles(
+            x=[2, 4, 8], y=[2, 4, 8], z=[0, 0, 0], size=[2, 2, 2]
+        )
+        self.assertIsInstance(particles.x, np.ndarray)
+        self.assertEqual(particles.x.size, 3)
+        self.assertEqual(particles.x.shape, (3,))
+        np.testing.assert_array_equal(particles.x, np.array([2, 4, 8]))
+
+        imgOne, partOne = take_image(laser, cam, particles, particle_peak_count=1000)
+        self.assertEqual(partOne.get_ppp(camera_size=cam.size), 3 / cam.size)
+
+        particles = Particles(
+            x=[-10, 4, 8], y=[2, 4, 8], z=[0, 0, 0], size=[2, 2, 2]
+        )
+
+        imgOne, partOne = take_image(laser, cam, particles, particle_peak_count=1000)
+        self.assertEqual(partOne.get_ppp(camera_size=cam.size), 2 / cam.size)
+
+        particles = Particles(
+            x=[2, 4, 8], y=[2, 4, 8], z=[0, 10, 0], size=[2, 2, 2]
+        )
+
+        imgOne, partOne = take_image(laser, cam, particles, particle_peak_count=1000)
+        self.assertEqual(partOne.get_ppp(camera_size=cam.size), 2 / cam.size)
+
     def test_generate_certain_ppp(self):
         laser = Laser(shape_factor=10 ** 3, width=10)
 
@@ -83,12 +132,17 @@ class TestParticles(unittest.TestCase):
             particle_image_diameter=2,
             seed=10
         )
-        partA = Particles.generate(ppp=0.01,
+        target_ppp = 0.01
+        partA = Particles.generate(ppp=target_ppp,
                                    dx_max=[100, 100],
                                    dy_max=[-100, 100],
                                    dz_max=[1, 1], camera=cam,
                                    laser=laser)
-        self.assertAlmostEqual(partA.get_ppp(cam.size), 0.01, delta=0.001)
+        print(partA.get_ppp(cam.size))
+        # check if crit is really reached (err < 0.01):
+        realized_ppp = partA.get_ppp(cam.size)
+        err = abs((realized_ppp - target_ppp) / target_ppp)
+        self.assertTrue(err <= 0.01)
 
     def test_single_particle(self):
         one_particle = Particles(

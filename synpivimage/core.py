@@ -110,7 +110,6 @@ def take_image(laser: Laser,
     n_too_weak = np.sum(weakly_illuminated)
     logger.debug(f'Particles with intensity below the noise level: {n_too_weak}')
 
-    logger.debug('=== STATISTICS ===')
     n_relevant = np.asarray(particles.flag & (ParticleFlag.IN_FOV.value + ParticleFlag.ILLUMINATED.value),
                             dtype=bool).sum()
     n_total = len(particles)
@@ -121,14 +120,13 @@ def take_image(laser: Laser,
     logger.debug(f'Out Of Plane in FOV: {n_out_of_plane}:')
 
     # capture the image
-    logger.debug('Capturing the image...')
     st = time.time()
     img, n_saturated = camera.take_image(particles)
     et = time.time() - st
-    logger.debug(f'...took: {et} s')
+    logger.debug(f'Capturing image took: {et} s')
 
-    n_valid = np.sum(particles.flag)
-    logger.debug(f'valid particles: {n_valid}:')
-    logger.debug(f'ppp={n_valid / (camera.ny * camera.nx):.4f}')
+    n_valid = np.sum(particles.active)
+    logger.debug(f'Number of valid particles: N_valid={n_valid}:')
+    logger.debug(f'Particles per pixel: ppp={n_valid / camera.size:.5f}')
 
     return img, particles

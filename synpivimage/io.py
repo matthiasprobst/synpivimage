@@ -213,7 +213,6 @@ class Imwriter:
         return self.write(imgB, 'B', particles)
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        print('Done')
         # we might want to rename the filenames
         n_filenames = len(self.img_filenames)
         n_digits = len(str(n_filenames))
@@ -322,6 +321,7 @@ class HDF5Writer:
         ds.dims[2].attach_scale(nx_ds)
         ny_ds = self._h5.create_dataset('ny', data=np.arange(self.camera.ny))
         ny_ds.make_scale()
+        ds.dims[1].attach_scale(ny_ds)
 
         if self.camera:
             camera_gr = self._h5.create_group('camera')
