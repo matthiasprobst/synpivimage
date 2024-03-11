@@ -12,7 +12,14 @@ __this_dir__ = pathlib.Path(__file__).parent
 
 logging.basicConfig()
 logger = logging.getLogger(__package__)
+
+_formatter = logging.Formatter(
+    '%(asctime)s,%(msecs)d %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',
+    datefmt='%Y-%m-%d_%H:%M:%S'
+)
+
 _sh = logging.StreamHandler()
+_sh.setFormatter(_formatter)
 logger.addHandler(_sh)
 
 
