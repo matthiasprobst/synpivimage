@@ -35,7 +35,6 @@ def generate_particles(ppp: float,
     logger.debug(f'Generating particles with a ppp of {ppp}')
     assert 0 < ppp < 1, f"Expected ppp to be between 0 and 1, got {ppp}"
 
-    i = 0
     if laser.shape_factor > 100:
         zmin = -laser.width / 2 - 0.01 * laser.width
         zmax = laser.width / 2 - + 0.01 * laser.width
@@ -49,11 +48,15 @@ def generate_particles(ppp: float,
     curr_ppp = 0
     # rel_dev = abs((curr_ppp - ppp) / ppp)
 
+    i = 0
     while abs((curr_ppp - ppp) / ppp) > 0.01:
         i += 1
-        xe = np.random.uniform(min(-dx_max[1], 0), max(camera.nx, camera.nx - dx_max[0]), N)
-        ye = np.random.uniform(min(-dy_max[1], 0), max(camera.ny, camera.ny - dy_max[0]), N)
-        ze = np.random.uniform(min(zmin, zmin - dz_max[1]), max(zmax, zmax + dz_max[0]), N)
+        if i == 1:
+            # generate a initial random distribution. From this. particles are either added or removed
+            logger.debug(f'Generate initial random distribution of {N} particles')
+            xe = np.random.uniform(min(-dx_max[1], 0), max(camera.nx, camera.nx - dx_max[0]), N)
+            ye = np.random.uniform(min(-dy_max[1], 0), max(camera.ny, camera.ny - dy_max[0]), N)
+            ze = np.random.uniform(min(zmin, zmin - dz_max[1]), max(zmax, zmax + dz_max[0]), N)
 
         particles = Particles(
             x=xe,
@@ -69,7 +72,7 @@ def generate_particles(ppp: float,
         # print(f'curr ppp: {curr_ppp:.5f}')
         diff_ppp = ppp - curr_ppp
         # print(f'diff ppp: {diff_ppp:.5f}')
-        Nadd = int(0.95 * diff_ppp * camera.size)  # dampen the addition by 10%
+        Nadd = int(diff_ppp * camera.size)  # dampen the addition by 10%
 
         if Nadd == 0:
             logger.debug('Stopping early because no new particles to be added.')
@@ -77,6 +80,26 @@ def generate_particles(ppp: float,
 
         logger.debug(f'Generate particles. Iteration {i}/{iter_max}: curr ppp: {curr_ppp:.5f}. '
                      f'diff ppp: {diff_ppp:.5f}. Adding {Nadd} particles')
+
+        if Nadd > 0:
+            # generate new particles within the given range
+            xe_new = np.random.uniform(min(-dx_max[1], 0), max(camera.nx, camera.nx - dx_max[0]), Nadd)
+            ye_new = np.random.uniform(min(-dy_max[1], 0), max(camera.ny, camera.ny - dy_max[0]), Nadd)
+            ze_new = np.random.uniform(min(zmin, zmin - dz_max[1]), max(zmax, zmax + dz_max[0]), Nadd)
+            # add them to the existing particles
+            _n_new = len(xe) + Nadd
+            xe = np.concatenate([xe, xe_new])
+            ye = np.concatenate([ye, ye_new])
+            ze = np.concatenate([ze, ze_new])
+            assert len(xe) == N + Nadd
+        elif Nadd < 0:
+            # remove particles
+            idx = np.random.choice(N, -Nadd, replace=False)
+            xe = np.delete(xe, idx)
+            ye = np.delete(ye, idx)
+            ze = np.delete(ze, idx)
+            assert len(xe) == N + Nadd
+
         N += Nadd
         err = abs((curr_ppp - ppp) / ppp)
 
