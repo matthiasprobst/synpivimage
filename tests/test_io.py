@@ -114,19 +114,19 @@ class TestIO(unittest.TestCase):
                                         particle_peak_count=1000)
 
         with synpivimage.HDF5Writer(__this_dir__ / 'data.hdf',
-                                    particle_dataset_name='img',
                                     overwrite=True,
-                                    camera=cam) as h5:
+                                    camera=cam,
+                                    laser=laser) as h5:
             h5.writeA(imgA=img)
             h5.writeA(imgA=img)
 
         with h5py.File(__this_dir__ / 'data.hdf', 'r') as h5:
-            self.assertEqual(h5['img_A'].shape, (2, 16, 16))
-            self.assertEqual(h5['img_A'].dtype, np.uint16)
-            self.assertEqual(h5['image_index'].shape, (2,))
-            self.assertEqual(h5['nx'].shape, (cam.nx,))
-            self.assertEqual(h5['ny'].shape, (cam.ny,))
-            self.assertEqual(h5['image_index'][0], 0)
-            self.assertEqual(h5['image_index'][1], 1)
-            np.testing.assert_array_equal(h5['nx'][()], np.arange(cam.nx))
-            np.testing.assert_array_equal(h5['ny'][()], np.arange(cam.ny))
+            self.assertEqual(h5['images/img_A'].shape, (2, 16, 16))
+            self.assertEqual(h5['images/img_A'].dtype, np.uint16)
+            self.assertEqual(h5['images/image_index'].shape, (2,))
+            self.assertEqual(h5['images/nx'].shape, (cam.nx,))
+            self.assertEqual(h5['images/ny'].shape, (cam.ny,))
+            self.assertEqual(h5['images/image_index'][0], 0)
+            self.assertEqual(h5['images/image_index'][1], 1)
+            np.testing.assert_array_equal(h5['images/nx'][()], np.arange(cam.nx))
+            np.testing.assert_array_equal(h5['images/ny'][()], np.arange(cam.ny))

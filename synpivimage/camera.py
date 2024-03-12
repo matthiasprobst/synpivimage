@@ -113,12 +113,11 @@ class Camera(BaseModel, Component):
         particles.image_quantized_electrons[active] = self._quantize(particles.image_electrons[active])[0]
         return self._quantize(electrons)
 
-    def save_jsonld(self, filename: Union[str, pathlib.Path]):
-        """Save the component to JSON"""
+    def model_dump_jsonld(self) -> str:
+        """Return JSON-LD str"""
         from pivmetalib import pivmeta
         from pivmetalib import m4i
         from .codemeta import get_package_meta
-        filename = pathlib.Path(filename)  # .with_suffix('.jsonld')
 
         def _build_iri(sn: str):
             if sn:
@@ -190,14 +189,19 @@ class Camera(BaseModel, Component):
             hasSourceCode=get_package_meta(),
             hasParameter=hasParameter
         )
+        return camera.model_dump_jsonld(
+            context={
+                "@import": 'https://raw.githubusercontent.com/matthiasprobst/pivmeta/main/pivmeta_context.jsonld',
+                # "codemeta": 'https://codemeta.github.io/terms/'
+            }
+        )
+
+    def save_jsonld(self, filename: Union[str, pathlib.Path]):
+        """Save the component to JSON"""
+        filename = pathlib.Path(filename)  # .with_suffix('.jsonld')
         with open(filename, 'w') as f:
             f.write(
-                camera.model_dump_jsonld(
-                    context={
-                        "@import": 'https://raw.githubusercontent.com/matthiasprobst/pivmeta/main/pivmeta_context.jsonld',
-                        # "codemeta": 'https://codemeta.github.io/terms/'
-                    }
-                )
+                self.model_dump_jsonld()
             )
         return filename
 

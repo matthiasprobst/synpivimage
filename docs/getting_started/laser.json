@@ -17,17 +17,17 @@
             "m4i:hasUnit": "mm",
             "m4i:hasKindOfQuantity": "http://qudt.org/vocab/unit/MilliM",
             "pivmeta:hasStandardName": "https://matthiasprobst.github.io/pivmeta#model_laser_sheet_thickness",
-            "@id": "local:b0edee9b-d8a6-4542-ab16-93bb99c1ca8b"
+            "@id": "local:f8834dec-db8a-4a40-a7c8-3982edb57419"
         },
         {
             "@type": "m4i:NumericalVariable",
             "rdfs:label": "shape_factor",
-            "m4i:hasVariableDescription": "The shape factor describes they laser beam shape. A value of 1 describes Gaussian beam shape. High value are top-hat-like shapes.",
+            "m4i:hasVariableDescription": "The shape factor describes the laser beam shape. A value of 1 describes Gaussian beam shape. High value are top-hat-like shapes.",
             "m4i:hasNumericalValue": "2",
             "m4i:hasUnit": "",
             "m4i:hasKindOfQuantity": "https://qudt.org/schema/qudt/DimensionlessUnit",
             "pivmeta:hasStandardName": "https://matthiasprobst.github.io/pivmeta#model_laser_sheet_shape_factor",
-            "@id": "local:26414db3-e79f-4fa7-aca7-3f159a48f3f2"
+            "@id": "local:47d3db16-e76e-4f09-bb94-2b954b49be0d"
         }
     ],
     "codemeta:hasSourceCode": {
@@ -38,9 +38,9 @@
                 "schema:affiliation": {
                     "@type": "Organization",
                     "foaf:name": "Karlsruhe Institute of Technology, Institute of Thermal Turbomachinery",
-                    "@id": "local:b93f863a-c503-4c7d-a7f3-7ae0a3329289"
+                    "@id": "local:f697e036-f221-46d7-8d26-01855c949813"
                 },
-                "@id": "local:4105bc9a-beed-42f3-8922-0925a03f19f3",
+                "@id": "local:cbe3eee5-e93e-4250-9df2-ff79643bd0ae",
                 "givenName": "Matthias",
                 "familyName": "Probst",
                 "email": "matthias.probst@kit.edu"
@@ -66,7 +66,7 @@
             "Windows",
             "macOS"
         ],
-        "@id": "local:93c51e36-c5d1-4a45-938d-ee7dff3b2499"
+        "@id": "local:760d9c5b-3e9e-405e-8d82-e2c0d16684d3"
     },
-    "@id": "local:ef47b12c-b7a8-4720-8f77-20e99edb752f"
+    "@id": "local:af618650-5a5b-4758-a922-efa066a04851"
 }

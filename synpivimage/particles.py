@@ -223,9 +223,11 @@ class Particles(Component):
         """Return the particles per pixel"""
         return self.active.sum() / camera_size
 
-    def regenerate(self):
-        """Regenerate the particles. The number of particles and hence the ppp will remain constant (within
-        a statistical deviation) but the position and size of the particles will change."""
+    def regenerate(self) -> "Particles":
+        """Regenerate the particles. Does return a new object and does not touch the current object!
+
+        The number of particles and hence the ppp will remain constant (within a statistical deviation)
+        but the position and size of the particles will change."""
         new_part = self.copy()
         N = len(self.x)
         x = np.random.uniform(min(self.x), max(self.x), N)

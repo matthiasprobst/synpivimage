@@ -115,25 +115,13 @@ class Laser(BaseModel, Component):
             plt.show()
         return Particles(**particles.dict())
 
-    def save_jsonld(self, filename: Union[str, pathlib.Path]) -> pathlib.Path:
-        """Save the component to JSON.
-
-        Parameters
-        ----------
-        filename : Union[str, pathlib.Path]
-            The filename to save the component to
-
-        Returns
-        -------
-        pathlib.Path
-            The filename the component was saved to
-        """
+    def model_dump_jsonld(self) -> str:
+        """Return JSON-LD string representation"""
         try:
             from pivmetalib import pivmeta
         except ImportError:
             raise ImportError("Please install `pivmetalib` to use this function: `pip install pivmetalib`")
 
-        filename = pathlib.Path(filename)  # .with_suffix('.jsonld')
         laser = pivmeta.LaserModel(
             hasParameter=[
                 pivmeta.NumericalVariable(
@@ -149,16 +137,30 @@ class Laser(BaseModel, Component):
                     hasStandardName=PIVMETA.model_laser_sheet_shape_factor,
                     hasUnit='',
                     hasKindOfQuantity="https://qudt.org/schema/qudt/DimensionlessUnit",
-                    hasVariableDescription='The shape factor describes they laser beam shape. A '
+                    hasVariableDescription='The shape factor describes the laser beam shape. A '
                                            'value of 1 describes Gaussian beam shape. '
                                            'High value are top-hat-like shapes.'),
             ],
             hasSourceCode=get_package_meta(),
         )
+        return laser.model_dump_jsonld(context={'local': 'http://example.org/'})
+
+    def save_jsonld(self, filename: Union[str, pathlib.Path]) -> pathlib.Path:
+        """Save the component to JSON.
+
+        Parameters
+        ----------
+        filename : Union[str, pathlib.Path]
+            The filename to save the component to
+
+        Returns
+        -------
+        pathlib.Path
+            The filename the component was saved to
+        """
+        filename = pathlib.Path(filename)
         with open(filename, 'w') as f:
-            f.write(
-                laser.model_dump_jsonld(context={'local': 'http://example.org/'})
-            )
+            f.write(self.model_dump_jsonld())
         return filename
 
     @classmethod

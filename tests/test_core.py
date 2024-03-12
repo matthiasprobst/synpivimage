@@ -286,8 +286,8 @@ class TestCore(unittest.TestCase):
         with iw as imwriter:
             for i in range(10):
                 imgA, particlesA = take_image(self.laser, self.cam, particles, particle_peak_count)
-                imwriter.writeA(imgA, particlesA)
-                imwriter.writeB(imgA, particlesA)
+                imwriter.writeA(i, imgA, particlesA)
+                imwriter.writeB(i, imgA, particlesA)
 
         self.assertTrue(iw.img_filenames[0].exists())
         self.assertTrue(iw.img_filenames[0].is_file())
