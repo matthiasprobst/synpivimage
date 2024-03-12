@@ -14,7 +14,8 @@ You will learn how to:
 
     SingleImage.ipynb
     DoubleImage.ipynb
-    Noise.ipynb
+    OutOfPlane.ipynb
     Laser.ipynb
+    Camera.ipynb
     IO.ipynb
 

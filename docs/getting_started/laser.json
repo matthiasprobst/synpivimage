@@ -17,7 +17,7 @@
             "m4i:hasUnit": "mm",
             "m4i:hasKindOfQuantity": "http://qudt.org/vocab/unit/MilliM",
             "pivmeta:hasStandardName": "https://matthiasprobst.github.io/pivmeta#model_laser_sheet_thickness",
-            "@id": "local:f8834dec-db8a-4a40-a7c8-3982edb57419"
+            "@id": "local:a0e1c3e6-ce15-4ae4-8aca-977de08b75ea"
         },
         {
             "@type": "m4i:NumericalVariable",
@@ -27,7 +27,7 @@
             "m4i:hasUnit": "",
             "m4i:hasKindOfQuantity": "https://qudt.org/schema/qudt/DimensionlessUnit",
             "pivmeta:hasStandardName": "https://matthiasprobst.github.io/pivmeta#model_laser_sheet_shape_factor",
-            "@id": "local:47d3db16-e76e-4f09-bb94-2b954b49be0d"
+            "@id": "local:97bf0498-c9a3-4b58-bf7d-983eb1e8c943"
         }
     ],
     "codemeta:hasSourceCode": {
@@ -38,9 +38,9 @@
                 "schema:affiliation": {
                     "@type": "Organization",
                     "foaf:name": "Karlsruhe Institute of Technology, Institute of Thermal Turbomachinery",
-                    "@id": "local:f697e036-f221-46d7-8d26-01855c949813"
+                    "@id": "local:77809efe-530a-4c5d-9201-677d0f9e92c4"
                 },
-                "@id": "local:cbe3eee5-e93e-4250-9df2-ff79643bd0ae",
+                "@id": "local:9956ec37-19d2-4f33-9225-8c9230a2a7fc",
                 "givenName": "Matthias",
                 "familyName": "Probst",
                 "email": "matthias.probst@kit.edu"
@@ -50,7 +50,7 @@
         "@context": "https://doi.org/10.5063/schema/codemeta-2.0",
         "license": "https://spdx.org/licenses/MIT",
         "name": "synpivimage",
-        "version": "1.0.0",
+        "version": "1.0.0a2",
         "description": "Tool to build synthetic Particle Image Velocimetry (PIV) images",
         "applicationCategory": "Engineering",
         "programmingLanguage": [
@@ -66,7 +66,7 @@
             "Windows",
             "macOS"
         ],
-        "@id": "local:760d9c5b-3e9e-405e-8d82-e2c0d16684d3"
+        "@id": "local:e83ef28b-19d3-4d67-9dc0-a5e21fed1b3d"
     },
-    "@id": "local:af618650-5a5b-4758-a922-efa066a04851"
+    "@id": "local:924e4ddb-ba3c-4cdf-888e-8ce9422c4b3e"
 }
