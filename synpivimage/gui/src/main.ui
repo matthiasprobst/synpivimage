@@ -196,7 +196,7 @@
       <rect>
        <x>10</x>
        <y>20</y>
-       <width>214</width>
+       <width>233</width>
        <height>357</height>
       </rect>
      </property>
@@ -236,53 +236,50 @@
        </widget>
       </item>
       <item row="3" column="0">
-       <widget class="QLabel" name="label_4">
+       <widget class="QLabel" name="particle_image_diameter_label">
+        <property name="toolTip">
+         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Standard deviation of gaussian distribution used for particle image intensity.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+        </property>
         <property name="text">
-         <string>dp mean</string>
+         <string>iparticle img. diam.</string>
         </property>
        </widget>
       </item>
       <item row="3" column="1">
-       <widget class="QDoubleSpinBox" name="particle_size_mean"/>
-      </item>
-      <item row="5" column="0">
-       <widget class="QLabel" name="label_5">
-        <property name="text">
-         <string>dp std</string>
+       <widget class="QDoubleSpinBox" name="particle_image_diameter">
+        <property name="enabled">
+         <bool>true</bool>
         </property>
        </widget>
       </item>
-      <item row="5" column="1">
-       <widget class="QDoubleSpinBox" name="particle_size_std"/>
-      </item>
-      <item row="7" column="0">
+      <item row="5" column="0">
        <widget class="QLabel" name="label_6">
         <property name="text">
          <string>laser width</string>
         </property>
        </widget>
       </item>
-      <item row="7" column="1">
+      <item row="5" column="1">
        <widget class="QDoubleSpinBox" name="laser_width"/>
       </item>
-      <item row="8" column="0">
+      <item row="6" column="0">
        <widget class="QLabel" name="label_7">
         <property name="text">
          <string>laser shape</string>
         </property>
        </widget>
       </item>
-      <item row="8" column="1">
+      <item row="6" column="1">
        <widget class="QSpinBox" name="laser_shape_factor"/>
       </item>
-      <item row="9" column="0">
+      <item row="7" column="0">
        <widget class="QLabel" name="label_12">
         <property name="text">
          <string>peak find</string>
         </property>
        </widget>
       </item>
-      <item row="9" column="1">
+      <item row="7" column="1">
        <widget class="QComboBox" name="peak_find">
         <item>
          <property name="text">
@@ -301,42 +298,25 @@
         </item>
        </widget>
       </item>
-      <item row="10" column="0">
+      <item row="8" column="0">
        <widget class="QLabel" name="label_13">
         <property name="text">
          <string>bit depth</string>
         </property>
        </widget>
       </item>
-      <item row="10" column="1">
+      <item row="8" column="1">
        <widget class="QSpinBox" name="bit_depth"/>
       </item>
-      <item row="11" column="0">
+      <item row="9" column="0">
        <widget class="QLabel" name="label_16">
         <property name="text">
          <string>particle intenstiy</string>
         </property>
        </widget>
       </item>
-      <item row="11" column="1">
+      <item row="9" column="1">
        <widget class="QSpinBox" name="particle_count"/>
-      </item>
-      <item row="4" column="0">
-       <widget class="QLabel" name="label_17">
-        <property name="toolTip">
-         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Standard deviation of gaussian distribution used for particle image intensity.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-        </property>
-        <property name="text">
-         <string>pattern_mean</string>
-        </property>
-       </widget>
-      </item>
-      <item row="4" column="1">
-       <widget class="QDoubleSpinBox" name="sigma">
-        <property name="enabled">
-         <bool>true</bool>
-        </property>
-       </widget>
       </item>
      </layout>
     </widget>

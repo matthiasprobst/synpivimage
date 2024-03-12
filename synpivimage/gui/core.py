@@ -1,7 +1,9 @@
-import matplotlib.pyplot as plt
-import numpy as np
 import pathlib
 import sys
+import warnings
+
+import matplotlib.pyplot as plt
+import numpy as np
 from PyQt5 import QtWidgets
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QHBoxLayout
@@ -10,12 +12,11 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 from scipy import signal
 from scipy.fft import rfft2, irfft2, fftshift
 
+import synpivimage
 import synpivimage as spi
 from lib.corr import CorrelationPlane
 from lib.plotting import gauss3ptfit
 from src.main import Ui_MainWindow
-from synpivimage.core import particle_intensity
-from synpivimage.velocityfield import ConstantField
 
 __this_dir__ = pathlib.Path(__file__).parent
 INIT_DIR = __this_dir__
@@ -43,9 +44,14 @@ def get_window(window_function, shape):
 
 def generate_correlation(imgA, imgB, window_function=None):
     if window_function != 'uniform':
-        win = get_window(window_function, imgA.shape)
-        f2a = np.conj(rfft2(win * imgA))
-        f2b = rfft2(win * imgB)
+        try:
+            win = get_window(window_function, imgA.shape)
+            f2a = np.conj(rfft2(win * imgA))
+            f2b = rfft2(win * imgB)
+        except (KeyError, NotImplementedError) as e:
+            warnings.warn(f'Unknown window function: {window_function}')
+            f2a = np.conj(rfft2(imgA))
+            f2b = rfft2(imgB)
     else:
         f2a = np.conj(rfft2(imgA))
         f2b = rfft2(imgB)
@@ -72,10 +78,10 @@ class Ui(QtWidgets.QMainWindow, Ui_MainWindow):
         self.particle_density.setMaximum(1)
         self.particle_density.setValue(0.1)
 
-        self.particle_size_mean.setMinimum(0.5)
-        self.particle_size_mean.setValue(2.5)
-        self.particle_size_std.setMinimum(0.0)
-        self.particle_size_std.setValue(0.0)
+        self.particle_image_diameter.setMinimum(0.5)
+        self.particle_image_diameter.setMaximum(10)
+        self.particle_image_diameter.setValue(2.5)
+        
         self.laser_width.setMinimum(0)
         self.laser_width.setValue(2)
         self.laser_shape_factor.setMinimum(1)
@@ -86,10 +92,6 @@ class Ui(QtWidgets.QMainWindow, Ui_MainWindow):
         self.particle_count.setMinimum(1)
         self.particle_count.setMaximum(2 ** 16)
         self.particle_count.setValue(1000)
-
-        self.sigma.setMinimum(0.01)
-        self.sigma.setMaximum(100)
-        self.sigma.setValue(1)
 
         self.dx.setMinimum(-100)
         self.dx.setMaximum(100)
@@ -127,8 +129,6 @@ class Ui(QtWidgets.QMainWindow, Ui_MainWindow):
         self.correlations = np.empty(shape=(n_imgs, ny, nx))
         self.particle_dataA = [{}] * n_imgs
         self.particle_dataB = [{}] * n_imgs
-        self.metasA = [{}] * n_imgs
-        self.metasB = [{}] * n_imgs
 
         plotting_layout1 = QHBoxLayout(self.plotwidget1)
         plotting_layout2 = QHBoxLayout(self.plotwidget2)
@@ -203,37 +203,35 @@ class Ui(QtWidgets.QMainWindow, Ui_MainWindow):
                 self.curr_img_index += 1
             self.update_plot()
 
-    def get_config(self):
-        self.current_config = spi.config.SynPivConfig(
-            ny=self.ny.value(),
+    def get_camera(self):
+        cam = synpivimage.Camera(
             nx=self.nx.value(),
+            ny=self.ny.value(),
             bit_depth=self.bit_depth.value(),
             dark_noise=self.darknoise.value(),
-            image_particle_peak_count=self.particle_count.value(),
-            laser_shape_factor=self.laser_shape_factor.value(),
-            laser_width=self.laser_width.value(),
-            noise_baseline=self.baseline.value(),
-            particle_number=int(self.particle_density.value() * self.ny.value() * self.nx.value()),
-            particle_position_file=None,
-            particle_size_illumination_dependency=True,
-            particle_size_mean=self.particle_size_mean.value(),
-            particle_size_std=self.particle_size_std.value(),
-            sigmax=self.sigma.value(),
-            sigmay=self.sigma.value(),
+            baseline_noise=self.baseline.value(),
+            shot_noise=self.shotnoise.isChecked(),
             fill_ratio_x=1.0,
             fill_ratio_y=1.0,
-            qe=1.,
+            particle_image_diameter=self.particle_image_diameter.value(),
+            qe=1,
             sensitivity=1.,
-            shot_noise=self.shotnoise.isChecked(),
         )
-        return self.current_config
+        return cam
+
+    def get_laser(self):
+        laser = synpivimage.Laser(
+            shape_factor=self.laser_shape_factor.value(),
+            width=self.laser_width.value()
+        )
+        return laser
 
     def generate_images(self, take_existing_particles=False):
-        cfg = self.get_config()
-        assert cfg.nx == self.nx.value()
-        assert cfg.ny == self.ny.value()
+        cam = self.get_camera()
+        laser = self.get_laser()
+
         n_imgs = self.n_imgs.value()
-        imgs_shape = (n_imgs, cfg.ny, cfg.nx)
+        imgs_shape = (n_imgs, cam.ny, cam.nx)
         if self.imgsA.shape != imgs_shape:
             print('reallocate image arrays')
             self.imgsA = np.empty(shape=imgs_shape)
@@ -241,38 +239,61 @@ class Ui(QtWidgets.QMainWindow, Ui_MainWindow):
             self.correlations = np.empty(shape=imgs_shape)
             self.particle_dataA = [{}] * n_imgs
             self.particle_dataB = [{}] * n_imgs
-            self.metasA = [{}] * n_imgs
-            self.metasB = [{}] * n_imgs
+
+        dx = self.dx.value()
+        dy = self.dy.value()
+        dz = self.dz.value()
+
+        if dx > 0:
+            dx_max = [0, dx]
+        else:
+            dx_max = [dx, 0]
+
+        if dy > 0:
+            dy_max = [0, dy]
+        else:
+            dy_max = [dy, 0]
+
+        if dz > 0:
+            dz_max = [0, dz]
+        else:
+            dz_max = [dz, 0]
 
         for i in range(n_imgs):
             if take_existing_particles:
                 particle_dataA = self.particle_dataA[i]
             else:
-                particle_dataA = None
+                particle_dataA = synpivimage.particles.Particles.generate(
+                    dx_max=dx_max, dy_max=dy_max, dz_max=dz_max,
+                    camera=cam,
+                    laser=laser,
+                    ppp=self.particle_density.value(),
+                )
 
-            imgA, self.metaA, partA = spi.generate_image(
-                cfg,
-                particle_data=particle_dataA
+            imgA, partA = synpivimage.take_image(
+                camera=cam,
+                laser=laser,
+                particles=particle_dataA,
+                particle_peak_count=self.particle_count.value(),
             )
 
-            cfield = ConstantField(dx=self.dx.value(), dy=self.dy.value(), dz=self.dz.value())
             if take_existing_particles:
                 particle_dataB = self.particle_dataA[i]
             else:
-                particle_dataB = cfield.displace(cfg, partA)
+                particle_dataB = particle_dataA.displace(dx=self.dx.value(), dy=self.dy.value(), dz=self.dz.value())
 
-            imgB, self.metaB, partB = spi.generate_image(
-                cfg,
-                particle_data=particle_dataB
+            imgB, partB = synpivimage.take_image(
+                camera=cam,
+                laser=laser,
+                particles=particle_dataB,
+                particle_peak_count=self.particle_count.value(),
             )
+
             self.imgsA[i, ...] = imgA
             self.imgsB[i, ...] = imgB
 
             self.particle_dataA[i] = partA
             self.particle_dataB[i] = partB
-
-            self.metasA[i] = self.metaA
-            self.metasB[i] = self.metaB
 
     def update_with_existing_images(self):
         # compute correlations:
@@ -304,7 +325,6 @@ class Ui(QtWidgets.QMainWindow, Ui_MainWindow):
         self.update_plot()
 
     def update_plot(self):
-        self.sigma.setValue(self.metasA[self.curr_img_index]['sigmax'])
         self._plot_imgA()
         self._plot_imgB()
         self._plot_correlation()
@@ -334,7 +354,6 @@ class Ui(QtWidgets.QMainWindow, Ui_MainWindow):
         self.canvas[1].draw()
 
     def _plot_correlation(self):
-
         self.axes[5].cla()
         self.axes[2].cla()
         im = self.axes[2].imshow(normalize(self.correlations[self.curr_img_index]), cmap='gray')
@@ -440,24 +459,25 @@ class Ui(QtWidgets.QMainWindow, Ui_MainWindow):
         # self.axes[4].vlines(self.dy.value() - self.ny.value() / 2, ylims[0], ylims[1], color='k', linestyle='--')
         # self.canvas[3].draw()
         # self.canvas[4].draw()
-        z = np.linspace(-2 * self.laser_width.value(), 2 * self.laser_width.value(), 1000)
-        laser_intensity = particle_intensity(z=z,
-                                             beam_width=self.laser_width.value(),  # laser beam width
-                                             s=self.laser_shape_factor.value(),  # shape factor
-                                             )
-        self.axes[3][0].plot(z, laser_intensity)
-        # self.axes[4][0].plot(z, laser_intensity)
+        if False:
+            z = np.linspace(-2 * self.laser_width.value(), 2 * self.laser_width.value(), 1000)
+            laser_intensity = particle_intensity(z=z,
+                                                 beam_width=self.laser_width.value(),  # laser beam width
+                                                 s=self.laser_shape_factor.value(),  # shape factor
+                                                 )
+            self.axes[3][0].plot(z, laser_intensity)
+            # self.axes[4][0].plot(z, laser_intensity)
 
-        self.axes[3][1].scatter(self.particle_dataA[self.curr_img_index].z, self.particle_dataA[self.curr_img_index].y,
-                                color='b', alpha=0.5, s=10, marker='o')
-        # draw vlines for laser
-        self.axes[3][1].vlines(-self.laser_width.value() / 2, 0, self.nx.value(), color='k', linestyle='--')
-        self.axes[3][1].vlines(self.laser_width.value() / 2, 0, self.nx.value(), color='k', linestyle='--')
+            self.axes[3][1].scatter(self.particle_dataA[self.curr_img_index].z, self.particle_dataA[self.curr_img_index].y,
+                                    color='b', alpha=0.5, s=10, marker='o')
+            # draw vlines for laser
+            self.axes[3][1].vlines(-self.laser_width.value() / 2, 0, self.nx.value(), color='k', linestyle='--')
+            self.axes[3][1].vlines(self.laser_width.value() / 2, 0, self.nx.value(), color='k', linestyle='--')
 
-        self.axes[3][1].scatter(self.particle_dataB[self.curr_img_index].z, self.particle_dataB[self.curr_img_index].y,
-                                color='r', alpha=0.5, s=10, marker='o')
-        self.axes[3][1].vlines(-self.laser_width.value() / 2, 0, self.nx.value(), color='k', linestyle='--')
-        self.axes[3][1].vlines(self.laser_width.value() / 2, 0, self.nx.value(), color='k', linestyle='--')
+            self.axes[3][1].scatter(self.particle_dataB[self.curr_img_index].z, self.particle_dataB[self.curr_img_index].y,
+                                    color='r', alpha=0.5, s=10, marker='o')
+            self.axes[3][1].vlines(-self.laser_width.value() / 2, 0, self.nx.value(), color='k', linestyle='--')
+            self.axes[3][1].vlines(self.laser_width.value() / 2, 0, self.nx.value(), color='k', linestyle='--')
 
         self.canvas[2].draw()
         self.canvas[3].draw()
