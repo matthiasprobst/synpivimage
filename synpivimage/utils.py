@@ -18,7 +18,7 @@ def generate_particles(ppp: float,
                        dz_max: Tuple[float, float],
                        camera: Camera,
                        laser: Laser,
-                       iter_max: int = 20):
+                       iter_max: int = 40):
     """Generates a particle class based on the current setup and given max displacements
 
     Parameters
@@ -83,7 +83,7 @@ def generate_particles(ppp: float,
         if err < 0.01:
             logger.debug(f'Convergence crit (err < 0.01- reached. Residual error {err * 100:.1f} %')
 
-        if i > iter_max:
+        if i >= iter_max:
             logger.debug(f'Reached max iteration of {iter_max}')
             break
 
