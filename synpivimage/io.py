@@ -1,3 +1,4 @@
+import abc
 import pathlib
 import shutil
 import warnings
@@ -17,7 +18,19 @@ from .particles import Particles
 Format = Literal['json', 'json-ld']
 
 
-class Imwriter:
+class Writer(abc.ABC):
+    """Abstract base class for writing images and metadata to disk."""
+
+    @abc.abstractmethod
+    def writeA(self, index: int, img: np.ndarray, particles: Particles = None) -> pathlib.Path:
+        """Write image A"""
+
+    @abc.abstractmethod
+    def writeB(self, index: int, img: np.ndarray, particles: Particles = None) -> pathlib.Path:
+        """Write image B"""
+
+
+class Imwriter(Writer):
     """Context manager for writing images and metadata to a folder.
 
     Example:
@@ -148,7 +161,7 @@ class Imwriter:
         self._enabled = False
 
 
-class HDF5Writer:
+class HDF5Writer(Writer):
     """Context manager for writing images and metadata to a folder.
 
     Example:
@@ -163,6 +176,8 @@ class HDF5Writer:
 
     def __init__(self,
                  filename: Union[str, pathlib.Path],
+                 *,
+                 n_images: int,
                  overwrite: bool = False,
                  camera: Camera = None,
                  laser: Laser = None):
@@ -173,6 +188,14 @@ class HDF5Writer:
         ----------
         filename : Union[str, pathlib.Path]
             The filename of the HDF5 file
+        n_images : int
+            Number of images to save. Needed to pre-allocate space in the HDF5 file
+        overwrite : bool
+            Overwrite the file if it exists
+        camera : Camera
+            Camera object
+        laser : Laser
+            Laser object
 
         """
         self.filename = pathlib.Path(filename)
@@ -180,8 +203,7 @@ class HDF5Writer:
         self.camera = camera
         self.laser = laser
         self._h5 = None
-        self._image_index_a = 0
-        self._image_index_b = 0
+        self._n_images = n_images
 
     def __enter__(self, n_imgs: Optional[int] = None):
         if self.filename.exists() and not self.overwrite:
@@ -195,25 +217,27 @@ class HDF5Writer:
         self._h5 = h5py.File(self.filename, 'w')
         return self
 
-    def _get_dsimgA(self):
+    def _get_dsimgA(self) -> "h5py.Dataset":
+        """Get or create the dataset for image A"""
         ds_nameA = "images/img_A"
         if ds_nameA in self._h5:
             return self._h5[ds_nameA]
         return self._h5.create_dataset(ds_nameA,
-                                       shape=(1, self.camera.ny, self.camera.nx),
-                                       maxshape=(None, None, None),
+                                       shape=(self._n_images, self.camera.ny, self.camera.nx),
+                                       maxshape=(self._n_images, self.camera.ny, self.camera.nx),
                                        dtype='uint16')
 
-    def _get_dsimgB(self):
+    def _get_dsimgB(self) -> "h5py.Dataset":
+        """Get or create the dataset for image A"""
         ds_nameA = "images/img_B"
         if ds_nameA in self._h5:
             return self._h5[ds_nameA]
         return self._h5.create_dataset(ds_nameA,
-                                       shape=(1, self.camera.ny, self.camera.nx),
-                                       maxshape=(None, None, None),
+                                       shape=(self._n_images, self.camera.ny, self.camera.nx),
+                                       maxshape=(self._n_images, self.camera.ny, self.camera.nx),
                                        dtype='uint16')
 
-    def _write_particles(self, ab: str, particles):
+    def _write_particles(self, index: int, ab: str, particles):
         """Write particles to HDF. data to write:
         x,y,z,size,source_intensity,max_image_photons,image_electrons,image_quantized_electrons,flag
 
@@ -222,99 +246,117 @@ class HDF5Writer:
         n = len(particles)
         if particle_group not in self._h5:
             gr = self._h5.create_group(particle_group)
-            ds = gr.create_dataset('x', shape=(1, n), maxshape=(None, n), dtype='float32')
+            ds_shape = (self._n_images, n)
+            ds = gr.create_dataset('x', shape=ds_shape, maxshape=(None, n), dtype='float32')
             ds[0, :] = particles.x
-            ds = gr.create_dataset('y', shape=(1, n), maxshape=(None, n), dtype='float32')
+            ds = gr.create_dataset('y', shape=ds_shape, maxshape=(None, n), dtype='float32')
             ds[0, :] = particles.y
-            ds = gr.create_dataset('z', shape=(1, n), maxshape=(None, n), dtype='float32')
+            ds = gr.create_dataset('z', shape=ds_shape, maxshape=(None, n), dtype='float32')
             ds[0, :] = particles.z
-            ds = gr.create_dataset('size', shape=(1, n), maxshape=(None, n), dtype='float32')
+            ds = gr.create_dataset('size', shape=ds_shape, maxshape=(None, n), dtype='float32')
             ds[0, :] = particles.size
-            ds = gr.create_dataset('source_intensity', shape=(1, n), maxshape=(None, n), dtype='float32')
+            ds = gr.create_dataset('source_intensity', shape=ds_shape, maxshape=(None, n), dtype='float32')
             ds[0, :] = particles.source_intensity
-            ds = gr.create_dataset('max_image_photons', shape=(1, n), maxshape=(None, n), dtype='float32')
+            ds = gr.create_dataset('max_image_photons', shape=ds_shape, maxshape=(None, n), dtype='float32')
             ds[0, :] = particles.max_image_photons
-            ds = gr.create_dataset('image_electrons', shape=(1, n), maxshape=(None, n), dtype='float32')
+            ds = gr.create_dataset('image_electrons', shape=ds_shape, maxshape=(None, n), dtype='float32')
             ds[0, :] = particles.image_electrons
-            ds = gr.create_dataset('image_quantized_electrons', shape=(1, n), maxshape=(None, n), dtype='float32')
+            ds = gr.create_dataset('image_quantized_electrons', shape=ds_shape, maxshape=(None, n), dtype='float32')
             ds[0, :] = particles.image_quantized_electrons
-            ds = gr.create_dataset('flag', shape=(1, n), maxshape=(None, n), dtype='uint8')
+            ds = gr.create_dataset('flag', shape=ds_shape, maxshape=(None, n), dtype='uint8')
             ds[0, :] = particles.flag
             ds.resize((ds.shape[0] + 1, *ds.shape[1:]))
-        else:
-            ds = self._h5[particle_group]['x']
-            ds.resize((ds.shape[0] + 1, *ds.shape[1:]))
-            ds[-1, :] = particles.x
 
-            ds = self._h5[particle_group]['y']
-            ds.resize((ds.shape[0] + 1, *ds.shape[1:]))
-            ds[-1, :] = particles.y
+            return
 
-            ds = self._h5[particle_group]['z']
-            ds.resize((ds.shape[0] + 1, *ds.shape[1:]))
-            ds[-1, :] = particles.z
+        ds = self._h5[particle_group]['x']
+        curr_shape = ds.shape
 
-            ds = self._h5[particle_group]['size']
-            ds.resize((ds.shape[0] + 1, *ds.shape[1:]))
-            ds[-1, :] = particles.size
+        if self._n_images is None:
+            ds.resize((curr_shape[0] + 1, *curr_shape[1:]))
+        ds[index, :] = particles.x
 
-            ds = self._h5[particle_group]['source_intensity']
-            ds.resize((ds.shape[0] + 1, *ds.shape[1:]))
-            ds[-1, :] = particles.source_intensity
+        ds = self._h5[particle_group]['y']
+        if self._n_images is None:
+            ds.resize((curr_shape[0] + 1, *curr_shape[1:]))
+        ds[index, :] = particles.y
 
-            ds = self._h5[particle_group]['max_image_photons']
-            ds.resize((ds.shape[0] + 1, *ds.shape[1:]))
-            ds[-1, :] = particles.max_image_photons
+        ds = self._h5[particle_group]['z']
+        if self._n_images is None:
+            ds.resize((curr_shape[0] + 1, *curr_shape[1:]))
+        ds[index, :] = particles.z
 
-            ds = self._h5[particle_group]['image_electrons']
-            ds.resize((ds.shape[0] + 1, *ds.shape[1:]))
-            ds[-1, :] = particles.image_electrons
+        ds = self._h5[particle_group]['size']
+        if self._n_images is None:
+            ds.resize((curr_shape[0] + 1, *curr_shape[1:]))
+        ds[index, :] = particles.size
 
-            ds = self._h5[particle_group]['image_quantized_electrons']
-            ds.resize((ds.shape[0] + 1, *ds.shape[1:]))
-            ds[-1, :] = particles.image_quantized_electrons
+        ds = self._h5[particle_group]['source_intensity']
+        if self._n_images is None:
+            ds.resize((curr_shape[0] + 1, *curr_shape[1:]))
+        ds[index, :] = particles.source_intensity
 
-            ds = self._h5[particle_group]['flag']
-            ds.resize((ds.shape[0] + 1, *ds.shape[1:]))
-            ds[-1, :] = particles.flag
+        ds = self._h5[particle_group]['max_image_photons']
+        if self._n_images is None:
+            ds.resize((curr_shape[0] + 1, *curr_shape[1:]))
+        ds[index, :] = particles.max_image_photons
 
-    def writeA(self, imgA: np.ndarray, particles: Particles = None):
+        ds = self._h5[particle_group]['image_electrons']
+        if self._n_images is None:
+            ds.resize((curr_shape[0] + 1, *curr_shape[1:]))
+        ds[index, :] = particles.image_electrons
+
+        ds = self._h5[particle_group]['image_quantized_electrons']
+        if self._n_images is None:
+            ds.resize((curr_shape[0] + 1, *curr_shape[1:]))
+        ds[index, :] = particles.image_quantized_electrons
+
+        ds = self._h5[particle_group]['flag']
+        if self._n_images is None:
+            ds.resize((curr_shape[0] + 1, *curr_shape[1:]))
+        ds[index, :] = particles.flag
+
+    def writeA(self, index: int, img: np.ndarray, particles: Particles = None):
         """Write image A
 
         Parameters
         ----------
-        imgA: np.ndarray
+        index: int
+            Image index
+        img: np.ndarray
             Image A array
         particles: Particles
             Particle object used to generate img A
         """
         ds = self._get_dsimgA()
-        ds.resize((self._image_index_a + 1, *ds.shape[1:]))
-        ds[self._image_index_a, ...] = imgA
+        if index >= ds.shape[0]:
+            raise KeyError(f'Image index {index} is out of range. Only {ds.shape[0]} images are expected, thus '
+                           f'index should be in the range [0, {ds.shape[0] - 1}]')
+        ds[index, ...] = img
 
         if particles is not None:
-            self._write_particles('A', particles)
+            self._write_particles(index, 'A', particles)
 
-        self._image_index_a += 1
-
-    def writeB(self, imgB: np.ndarray, particles: Particles = None):
+    def writeB(self, index: int, img: np.ndarray, particles: Particles = None):
         """Write image B
 
         Parameters
         ----------
-        imgB: np.ndarray
+        index: int
+            Image index
+        img: np.ndarray
             Image B array
         particles: Particles
             Particle object used to generate img B
         """
         ds = self._get_dsimgB()
-        ds.resize((self._image_index_a + 1, *ds.shape[1:]))
-        ds[self._image_index_a, ...] = imgB
+        if index >= ds.shape[0]:
+            raise KeyError(f'Image index {index} is out of range. Only {ds.shape[0]} images are expected, thus '
+                           f'index should be in the range [0, {ds.shape[0] - 1}]')
+        ds[index, ...] = img
 
         if particles is not None:
-            self._write_particles('B', particles)
-
-        self._image_index_a += 1
+            self._write_particles(index, 'B', particles)
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         ds = self._get_dsimgA()

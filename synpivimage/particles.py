@@ -284,48 +284,48 @@ class Particles(Component):
         from .codemeta import get_package_meta
         filename = pathlib.Path(filename)  # .with_suffix('.jsonld')
 
-        source_intensity = 0. if np.all(self.source_intensity == 0) else self.source_intensity.tolist()
-        max_image_photons = 0. if np.all(self.max_image_photons == 0) else self.max_image_photons.tolist()
-        image_electrons = 0. if np.all(self.image_electrons == 0) else self.image_electrons.tolist()
+        source_intensity = 0. if np.all(self.source_intensity == 0) else self.source_intensity
+        max_image_photons = 0. if np.all(self.max_image_photons == 0) else self.max_image_photons
+        image_electrons = 0. if np.all(self.image_electrons == 0) else self.image_electrons
         image_quantized_electrons = 0. if np.all(
-            self.image_quantized_electrons == 0) else self.image_quantized_electrons.tolist()
+            self.image_quantized_electrons == 0) else self.image_quantized_electrons
 
         hasParameter = [
             m4i.variable.NumericalVariable(
                 label='x',
-                hasNumericalValue=self.x.tolist()
+                hasNumericalValue=self.x.astype("float16").tolist()
             ),
             m4i.variable.NumericalVariable(
                 label='y',
-                hasNumericalValue=self.y.tolist()
+                hasNumericalValue=self.y.astype("float16").tolist()
             ),
             m4i.variable.NumericalVariable(
                 label='z',
-                hasNumericalValue=self.z.tolist()
+                hasNumericalValue=self.z.astype("float16").tolist()
             ),
             m4i.variable.NumericalVariable(
                 label='size',
-                hasNumericalValue=self.size.tolist()
+                hasNumericalValue=self.size.astype("float16").tolist()
             ),
             m4i.variable.NumericalVariable(
                 label='flag',
-                hasNumericalValue=self.flag.tolist()
+                hasNumericalValue=self.flag.astype("uint8").tolist()
             ),
             m4i.variable.NumericalVariable(
                 label='source_intensity',
-                hasNumericalValue=source_intensity
+                hasNumericalValue=np.asarray(source_intensity, dtype="uint16").tolist()
             ),
             m4i.variable.NumericalVariable(
                 label='max_image_photons',
-                hasNumericalValue=max_image_photons
+                hasNumericalValue=np.asarray(max_image_photons, dtype="uint16").tolist()
             ),
             m4i.variable.NumericalVariable(
                 label='image_electrons',
-                hasNumericalValue=image_electrons
+                hasNumericalValue=np.asarray(image_electrons, dtype="uint16").tolist()
             ),
             m4i.variable.NumericalVariable(
                 label='image_quantized_electrons',
-                hasNumericalValue=image_quantized_electrons
+                hasNumericalValue=np.asarray(image_quantized_electrons, dtype="uint16").tolist()
             ),
         ]
         particles = pivmeta.SyntheticParticle(

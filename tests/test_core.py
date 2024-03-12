@@ -134,7 +134,7 @@ class TestParticles(unittest.TestCase):
         )
         target_ppp = 0.01
         partA = Particles.generate(ppp=target_ppp,
-                                   dx_max=[100, 100],
+                                   dx_max=[10, 100],
                                    dy_max=[-100, 100],
                                    dz_max=[1, 1], camera=cam,
                                    laser=laser)
@@ -299,6 +299,8 @@ class TestCore(unittest.TestCase):
         pathlib.Path(pathlib.Path('img01a.tiff')).unlink(missing_ok=True)
         pathlib.Path(pathlib.Path('img01a.hdf')).unlink(missing_ok=True)
         pathlib.Path(pathlib.Path('img01a.json')).unlink(missing_ok=True)
+
+
 #
 #
 # class TestCore(unittest.TestCase):

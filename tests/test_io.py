@@ -114,11 +114,14 @@ class TestIO(unittest.TestCase):
                                         particle_peak_count=1000)
 
         with synpivimage.HDF5Writer(__this_dir__ / 'data.hdf',
+                                    n_images=2,
                                     overwrite=True,
                                     camera=cam,
                                     laser=laser) as h5:
-            h5.writeA(imgA=img)
-            h5.writeA(imgA=img)
+            h5.writeA(0, img=img)
+            h5.writeA(1, img=img)
+            with self.assertRaises(KeyError):
+                h5.writeA(2, img=img)
 
         with h5py.File(__this_dir__ / 'data.hdf', 'r') as h5:
             self.assertEqual(h5['images/img_A'].shape, (2, 16, 16))
