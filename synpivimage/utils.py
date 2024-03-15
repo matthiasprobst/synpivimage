@@ -1,4 +1,5 @@
 import logging
+import warnings
 from typing import Tuple
 
 import numpy as np
@@ -16,9 +17,10 @@ def generate_particles(ppp: float,
                        dx_max: Tuple[float, float],
                        dy_max: Tuple[float, float],
                        dz_max: Tuple[float, float],
+                       size: float,
                        camera: Camera,
                        laser: Laser,
-                       iter_max: int = 40):
+                       **kwargs) -> Particles:
     """Generates a particle class based on the current setup and given max displacements
 
     Parameters
@@ -31,7 +33,27 @@ def generate_particles(ppp: float,
         Maximal displacement in y-direction [lower, upper]
     dz_max: Tuple[float, float]
         Maximal displacement in z-direction [lower, upper]
+    camera: Camera
+        camera
+    laser: Laser
+        laser
+    size: float
+        Particle size
+    kwargs:
+        iter_max: int=40
+            Max. iteration for particle number determination algorithm
+        N_max: int=10**7
+            Max. number of particles
+
+    Returns
+    -------
+    particles: Particles
+        The generated particles
     """
+
+    iter_max = kwargs.get('iter_max', 40)
+    N_max = kwargs.get('N_ma', 10 ** 7)
+
     logger.debug(f'Generating particles with a ppp of {ppp}')
     assert 0 < ppp < 1, f"Expected ppp to be between 0 and 1, got {ppp}"
 
@@ -43,36 +65,50 @@ def generate_particles(ppp: float,
         zmax = laser.width
     area = (camera.nx + (dx_max[1] - dx_max[0])) * (camera.ny + (dy_max[1] - dy_max[0]))
     N = int(area * ppp)
+    if N < 2:
+        raise ValueError(
+            'Number of particles is too low. For generation of only one particle,'
+            ' please use discrete generation by providing the coordinates'
+        )
+    logger.debug(f'Initial particle count: {N}')
     # Ntarget = ppp * camera.size
 
     curr_ppp = 0
     # rel_dev = abs((curr_ppp - ppp) / ppp)
 
+    _xlim = min(-dx_max[1], 0), max(camera.nx, camera.nx - dx_max[0])
+    _ylim = min(-dy_max[1], 0), max(camera.ny, camera.ny - dy_max[0])
+    _zlim = min(zmin, zmin - dz_max[1]), max(zmax, zmax + dz_max[0])
+
+    x_extent = _xlim[1] - _xlim[0]
+    y_extent = _ylim[1] - _ylim[0]
+
+    n_too_much_noise = 0
     i = 0
     while abs((curr_ppp - ppp) / ppp) > 0.01:
         i += 1
         if i == 1:
             # generate a initial random distribution. From this. particles are either added or removed
             logger.debug(f'Generate initial random distribution of {N} particles')
-            xe = np.random.uniform(min(-dx_max[1], 0), max(camera.nx, camera.nx - dx_max[0]), N)
-            ye = np.random.uniform(min(-dy_max[1], 0), max(camera.ny, camera.ny - dy_max[0]), N)
-            ze = np.random.uniform(min(zmin, zmin - dz_max[1]), max(zmax, zmax + dz_max[0]), N)
+            xe = np.random.uniform(*_xlim, N)
+            ye = np.random.uniform(*_ylim, N)
+            ze = np.random.uniform(*_zlim, N)
 
         particles = Particles(
             x=xe,
             y=ye,
             z=ze,
-            size=np.ones_like(xe) * 2
+            size=size * np.ones_like(xe)
         )
         _img, _part = take_image(particles=particles,
                                  camera=camera,
                                  laser=laser,
                                  particle_peak_count=1000)
-        curr_ppp = _part.active.sum() / camera.size
-        # print(f'curr ppp: {curr_ppp:.5f}')
+        curr_ppp = _part.get_ppp(camera.size)  # _part.active.sum() / camera.size
+
         diff_ppp = ppp - curr_ppp
-        # print(f'diff ppp: {diff_ppp:.5f}')
-        Nadd = int(diff_ppp * camera.size)  # dampen the addition by 10%
+
+        Nadd = int(diff_ppp * x_extent * y_extent)
 
         if Nadd == 0:
             logger.debug('Stopping early because no new particles to be added.')
@@ -80,12 +116,11 @@ def generate_particles(ppp: float,
 
         logger.debug(f'Generate particles. Iteration {i}/{iter_max}: curr ppp: {curr_ppp:.5f}. '
                      f'diff ppp: {diff_ppp:.5f}. Adding {Nadd} particles')
-
         if Nadd > 0:
             # generate new particles within the given range
-            xe_new = np.random.uniform(min(-dx_max[1], 0), max(camera.nx, camera.nx - dx_max[0]), Nadd)
-            ye_new = np.random.uniform(min(-dy_max[1], 0), max(camera.ny, camera.ny - dy_max[0]), Nadd)
-            ze_new = np.random.uniform(min(zmin, zmin - dz_max[1]), max(zmax, zmax + dz_max[0]), Nadd)
+            xe_new = np.random.uniform(*_xlim, Nadd)
+            ye_new = np.random.uniform(*_ylim, Nadd)
+            ze_new = np.random.uniform(*_zlim, Nadd)
             # add them to the existing particles
             _n_new = len(xe) + Nadd
             xe = np.concatenate([xe, xe_new])
@@ -101,6 +136,18 @@ def generate_particles(ppp: float,
             assert len(xe) == N + Nadd
 
         N += Nadd
+        
+        if N > N_max:
+            raise ValueError(f'Number of particles exceeded maximum of {N_max}. '
+                             f'Consider increasing the number of iterations or the particle size')
+
+        if curr_ppp == 0 and _part.in_fov.sum() > 0:
+            n_too_much_noise += 1
+            warnings.warn('No particles in the field of view are illuminated beyond the laser noise. Consider using a'
+                          'smaller noise level or a larger particle size.')
+            if n_too_much_noise > 10:
+                raise ValueError('Too many iterations without any particles in the field of view. Stopping.')
+
         err = abs((curr_ppp - ppp) / ppp)
 
         if err < 0.01:
@@ -110,4 +157,7 @@ def generate_particles(ppp: float,
             logger.debug(f'Reached max iteration of {iter_max}')
             break
 
+    _part._xlim = _xlim
+    _part._ylim = _ylim
+    _part._zlim = _zlim
     return _part

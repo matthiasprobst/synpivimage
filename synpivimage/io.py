@@ -366,12 +366,16 @@ class HDF5Writer(Writer):
         img_idx_ds.make_scale()
 
         ds.dims[0].attach_scale(img_idx_ds)
-        nx_ds = ds.parent.create_dataset('nx', data=np.arange(self.camera.nx))
+        nx_ds = ds.parent.create_dataset('ix', data=np.arange(self.camera.nx))
+        ds.attrs['long_name'] = 'x pixel coordinate'
+        ds.attrs['standard_name'] = 'x_pixel_coordinate'  # https://matthiasprobst.github.io/pivmeta/#x_pixel_coordinate
         nx_ds.make_scale()
         ds.dims[2].attach_scale(nx_ds)
 
-        ny_ds = ds.parent.create_dataset('ny', data=np.arange(self.camera.ny))
+        ny_ds = ds.parent.create_dataset('iy', data=np.arange(self.camera.ny))
         ny_ds.make_scale()
+        ds.attrs['long_name'] = 'y pixel coordinate'
+        ds.attrs['standard_name'] = 'y_pixel_coordinate'  # https://matthiasprobst.github.io/pivmeta/#x_pixel_coordinate
         ds.dims[1].attach_scale(ny_ds)
 
         for cmp_name, cmp, onto_model in zip(('laser', 'camera'),

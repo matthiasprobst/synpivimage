@@ -48,6 +48,13 @@ def take_image(laser: Laser,
         The peak count of the particles
     kwargs : dict
         Additional parameters
+
+    Returns
+    -------
+    img: np.ndarray
+        The created image
+    particles:
+        The updated Particles object
     """
     logger = kwargs.get('logger', LOGGER)
     # compute the particle intensity factor in order to reach particle_peak_count

@@ -116,6 +116,9 @@ class Particles(Component):
         self._image_electrons = _parse_array(image_electrons, N)
         self._image_quantized_electrons = _parse_array(image_quantized_electrons, N)
         self._flag = _parse_array(flag, N, dtype=int)
+        self._xlim = None
+        self._ylim = None
+        self._zlim = None
 
     @property
     def x(self):
@@ -212,32 +215,44 @@ class Particles(Component):
         self._flag = np.zeros_like(self.x, dtype=int)
 
     @classmethod
-    def generate(cls, ppp: float, dx_max, dy_max, dz_max, camera, laser) -> "Particles":
+    def generate(cls, ppp: float, dx_max, dy_max, dz_max, size, camera, laser) -> "Particles":
         """Generate particles based on a certain ppp (particles per pixel). With
         dx, dy, dz the maximum displacement of the particles can be set. The camera and laser
         are used to determine the sensor size and the laser width."""
         from .utils import generate_particles
-        return generate_particles(ppp=ppp, dx_max=dx_max, dy_max=dy_max, dz_max=dz_max, camera=camera, laser=laser)
+        return generate_particles(ppp=ppp, dx_max=dx_max, dy_max=dy_max, dz_max=dz_max, size=size, camera=camera, laser=laser)
 
     def get_ppp(self, camera_size: int) -> float:
         """Return the particles per pixel"""
         return self.active.sum() / camera_size
 
     def regenerate(self) -> "Particles":
-        """Regenerate the particles. Does return a new object and does not touch the current object!
+        """Regenerate the particles of this object.
+        The locations (x, y, z) of the particles will change and the intensities
+        will be reset
 
-        The number of particles and hence the ppp will remain constant (within a statistical deviation)
-        but the position and size of the particles will change."""
-        new_part = self.copy()
+        .. note::
+
+            Does NOT create a new object!
+            The returned object is the same
+        """
+        self.reset()
         N = len(self.x)
-        x = np.random.uniform(min(self.x), max(self.x), N)
-        y = np.random.uniform(min(self.y), max(self.y), N)
-        z = np.random.uniform(min(self.z), max(self.z), N)
-        new_part._x = x
-        new_part._y = y
-        new_part._z = z
-        new_part.reset()
-        return new_part
+        if self._xlim is None:
+            self._x = np.random.uniform(min(self.x), max(self.x), N)
+        else:
+            self._x = np.random.uniform(*self._xlim, N)
+
+        if self._ylim is None:
+            self._y = np.random.uniform(min(self.y), max(self.y), N)
+        else:
+            self._y = np.random.uniform(*self._ylim, N)
+
+        if self._ylim is None:
+            self._z = np.random.uniform(min(self.z), max(self.z), N)
+        else:
+            self._z = np.random.uniform(*self._zlim, N)
+        return self
 
     def __len__(self):
         return self.x.size
@@ -508,7 +523,7 @@ def compute_intensity_distribution(
     xp : float
         x-coordinate of the particles on the sensor in pixels
     yp : float
-        y-coordinate of the particles on thesensor in pixels
+        y-coordinate of the particles on the sensor in pixels
     dp : float
         particle image diameter (in pixels)
     sigmax : float

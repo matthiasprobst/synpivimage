@@ -77,7 +77,7 @@ class Laser(BaseModel, Component):
         Returns
         -------
         Particles
-            The illuminated particles (new object!)
+            The illuminated particles (same object!)
         """
         logger = kwargs.get('logger', LOGGER)
 
@@ -92,6 +92,8 @@ class Laser(BaseModel, Component):
             laser_intensity = tophat(self.width)
         else:
             laser_intensity = real(dz0, s)
+
+        particles.reset()
         particles.source_intensity = laser_intensity(particles.z)
 
         inside_laser = particles.source_intensity > np.exp(-2)
@@ -113,7 +115,9 @@ class Laser(BaseModel, Component):
             plt.ylabel('Normalized particle intensity in beam / -')
             plt.grid()
             plt.show()
-        return Particles(**particles.dict())
+
+        return particles
+        # return Particles(**particles.dict())
 
     def model_dump_jsonld(self) -> str:
         """Return JSON-LD string representation"""

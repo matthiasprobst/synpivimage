@@ -66,6 +66,25 @@ class TestLaser(unittest.TestCase):
 
 class TestParticles(unittest.TestCase):
 
+    def test_regenerate(self):
+        particles = Particles(
+            x=4, y=4, z=0, size=2
+        )
+        particles.regenerate()
+        self.assertEqual(particles.x, 4)
+        self.assertEqual(particles.y, 4)
+
+        particles = Particles(
+            x=[4, 10], y=[4, 10], z=[0, 0], size=[2, 2]
+        )
+        self.assertEqual(particles.x[0], 4)
+        self.assertEqual(particles.x[1], 10)
+        new_part = particles.regenerate()
+        self.assertNotEqual(particles.x[0], 4)
+        self.assertNotEqual(particles.x[1], 10)
+
+        self.assertTrue(new_part, particles)
+
     def test_compute_ppp(self):
         laser = Laser(
             width=0.25,
@@ -88,6 +107,8 @@ class TestParticles(unittest.TestCase):
             x=4, y=4, z=0, size=2
         )
         imgOne, partOne = take_image(laser, cam, particles, particle_peak_count=1000)
+        self.assertTrue(particles is partOne)
+
         self.assertEqual(partOne.get_ppp(camera_size=cam.size), 1 / cam.size)
 
         particles = Particles(
@@ -136,13 +157,80 @@ class TestParticles(unittest.TestCase):
         partA = Particles.generate(ppp=target_ppp,
                                    dx_max=[10, 100],
                                    dy_max=[-100, 100],
-                                   dz_max=[1, 1], camera=cam,
+                                   dz_max=[1, 1],
+                                   size=2,
+                                   camera=cam,
                                    laser=laser)
         print(partA.get_ppp(cam.size))
         # check if crit is really reached (err < 0.01):
         realized_ppp = partA.get_ppp(cam.size)
         err = abs((realized_ppp - target_ppp) / target_ppp)
         self.assertTrue(err <= 0.01)
+
+    def test_generate_certain_ppp_with_noise(self):
+        laser = Laser(shape_factor=10 ** 3, width=10)
+
+        cam = Camera(
+            nx=128,
+            ny=128,
+            bit_depth=16,
+            qe=1,
+            sensitivity=1,
+            baseline_noise=0,
+            dark_noise=0,
+            shot_noise=False,
+            fill_ratio_x=1.0,
+            fill_ratio_y=1.0,
+            particle_image_diameter=4,
+            seed=10
+        )
+
+        true_dx = 0.6
+        true_dy = 0.3
+        ppp_list = np.linspace(0.001, 0.1, 11, dtype='float32')
+        dark_noise_list = np.linspace(0, 100, 6, dtype='float32')
+        for ppp in ppp_list[:]:
+            for dark_noise in dark_noise_list:
+                cam.dark_noise = dark_noise
+                particles = Particles.generate(
+                    ppp=ppp,
+                    dx_max=[0, true_dx],
+                    dy_max=[0, true_dy],
+                    dz_max=[0, 0],
+                    size=2,
+                    camera=cam,
+                    laser=laser)
+
+                realized_ppp = particles.get_ppp(cam.size)
+                err = abs((realized_ppp - ppp) / ppp)
+                self.assertTrue(err <= 0.05, msg=f'ppp: {ppp}, realized_ppp: {realized_ppp}, err: {err}')
+
+    def test_too_much_noise(self):
+        laser = Laser(shape_factor=10 ** 3, width=10)
+
+        cam = Camera(
+            nx=128,
+            ny=128,
+            bit_depth=16,
+            qe=1,
+            sensitivity=1,
+            baseline_noise=0,
+            dark_noise=1000,  # too much dark noise!
+            shot_noise=False,
+            fill_ratio_x=1.0,
+            fill_ratio_y=1.0,
+            particle_image_diameter=2,
+            seed=10
+        )
+        target_ppp = 0.01
+        with self.assertRaises(ValueError):
+            partA = Particles.generate(ppp=target_ppp,
+                                       dx_max=[10, 100],
+                                       dy_max=[-100, 100],
+                                       dz_max=[1, 1],
+                                       size=2,
+                                       camera=cam,
+                                       laser=laser)
 
     def test_single_particle(self):
         one_particle = Particles(
@@ -299,7 +387,6 @@ class TestCore(unittest.TestCase):
         pathlib.Path(pathlib.Path('img01a.tiff')).unlink(missing_ok=True)
         pathlib.Path(pathlib.Path('img01a.hdf')).unlink(missing_ok=True)
         pathlib.Path(pathlib.Path('img01a.json')).unlink(missing_ok=True)
-
 
 #
 #
