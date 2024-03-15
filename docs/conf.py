@@ -35,9 +35,23 @@ extensions = ['sphinx.ext.autodoc',
               "IPython.sphinxext.ipython_console_highlighting",
               "sphinx_copybutton",
               "nbsphinx",
+              "sphinx_math_dollar",
+              "sphinx.ext.mathjax",
               "sphinx_design",
               "myst_nb", ]
+mathjax_config = {
+    'tex2jax': {
+        'inlineMath': [ ["\\(","\\)"] ],
+        'displayMath': [["\\[","\\]"] ],
+    },
+}
 
+mathjax3_config = {
+  "tex": {
+    "inlineMath": [['\\(', '\\)']],
+    "displayMath": [["\\[", "\\]"]],
+  }
+}
 # Napoleon configurations
 napoleon_google_docstring = False
 napoleon_numpy_docstring = True
