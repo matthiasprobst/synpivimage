@@ -11,4 +11,4 @@ myst-nb
 nbsphinx
 sphinxcontrib-bibtex
 sphinx-math-dollar
-h5rdmtoolbox @ git+https://github.com/matthiasprobst/h5RDMtoolbox@dev-jsonld
+h5rdmtoolbox @ git+https://github.com/matthiasprobst/h5RDMtoolbox@main
