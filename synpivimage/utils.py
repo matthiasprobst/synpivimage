@@ -136,7 +136,7 @@ def generate_particles(ppp: float,
             assert len(xe) == N + Nadd
 
         N += Nadd
-        
+
         if N > N_max:
             raise ValueError(f'Number of particles exceeded maximum of {N_max}. '
                              f'Consider increasing the number of iterations or the particle size')

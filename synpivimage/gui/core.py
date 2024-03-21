@@ -81,7 +81,7 @@ class Ui(QtWidgets.QMainWindow, Ui_MainWindow):
         self.particle_image_diameter.setMinimum(0.5)
         self.particle_image_diameter.setMaximum(10)
         self.particle_image_diameter.setValue(2.5)
-        
+
         self.laser_width.setMinimum(0)
         self.laser_width.setValue(2)
         self.laser_shape_factor.setMinimum(1)

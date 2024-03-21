@@ -74,7 +74,6 @@ class Imwriter(Writer):
 
         image_dir.mkdir(parents=True, exist_ok=True)
         (image_dir / 'imgs').mkdir(parents=True, exist_ok=True)
-        (image_dir / 'particles').mkdir(parents=True, exist_ok=True)
 
         if self.camera:
             self.camera.save_jsonld(image_dir / 'camera.json')
@@ -112,11 +111,13 @@ class Imwriter(Writer):
         cv2.imwrite(str(img_filename), np.asarray(img))
 
         if particles:
-            particle_filename = self.image_dir / 'particles' / f'particles_{index:06d}{ab}.json'
-            particles.save_jsonld(self.image_dir / 'particles' / f'particles_{index:06d}{ab}.json')
+            particle_dir = (self.image_dir / 'particles')
+            particle_dir.mkdir(parents=True, exist_ok=True)
+            particle_filename = particle_dir / f'particles_{index:06d}{ab}.json'
+            particles.save_jsonld(particle_dir / f'particles_{index:06d}{ab}.json')
+            self.particle_filenames.append(particle_filename)
 
         self.img_filenames.append(img_filename)
-        self.particle_filenames.append(particle_filename)
         return img_filename
 
     def writeA(self, index: int, img: np.ndarray, particles: Particles = None) -> pathlib.Path:
