@@ -265,6 +265,7 @@ class Ui(QtWidgets.QMainWindow, Ui_MainWindow):
             else:
                 particle_dataA = synpivimage.particles.Particles.generate(
                     dx_max=dx_max, dy_max=dy_max, dz_max=dz_max,
+                    size=2.,  # TODO: should not be default
                     camera=cam,
                     laser=laser,
                     ppp=self.particle_density.value(),
@@ -468,13 +469,15 @@ class Ui(QtWidgets.QMainWindow, Ui_MainWindow):
             self.axes[3][0].plot(z, laser_intensity)
             # self.axes[4][0].plot(z, laser_intensity)
 
-            self.axes[3][1].scatter(self.particle_dataA[self.curr_img_index].z, self.particle_dataA[self.curr_img_index].y,
+            self.axes[3][1].scatter(self.particle_dataA[self.curr_img_index].z,
+                                    self.particle_dataA[self.curr_img_index].y,
                                     color='b', alpha=0.5, s=10, marker='o')
             # draw vlines for laser
             self.axes[3][1].vlines(-self.laser_width.value() / 2, 0, self.nx.value(), color='k', linestyle='--')
             self.axes[3][1].vlines(self.laser_width.value() / 2, 0, self.nx.value(), color='k', linestyle='--')
 
-            self.axes[3][1].scatter(self.particle_dataB[self.curr_img_index].z, self.particle_dataB[self.curr_img_index].y,
+            self.axes[3][1].scatter(self.particle_dataB[self.curr_img_index].z,
+                                    self.particle_dataB[self.curr_img_index].y,
                                     color='r', alpha=0.5, s=10, marker='o')
             self.axes[3][1].vlines(-self.laser_width.value() / 2, 0, self.nx.value(), color='k', linestyle='--')
             self.axes[3][1].vlines(self.laser_width.value() / 2, 0, self.nx.value(), color='k', linestyle='--')

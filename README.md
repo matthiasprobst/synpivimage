@@ -45,7 +45,7 @@ For running tests:
 pip install .[test]
 ```
 
-For using the GUI:
+For using the GUI (experimentally at this stage!!! see [gui doc section](#gui)):
 ```cmd
 pip install .[gui]
 ```
@@ -122,6 +122,12 @@ with synpivimage.HDF5Writer(case_name="test_case",
     hw.writeA(0, imgA, partA)
     hw.writeB(0, imgB, partB)
 ```
+
+## GUI
+Is experimental and more for demonstrating and debugging purposes.
+
+
+Go to `synpivimage/gui` and run `python core.py` to start the GUI.
 
 ## Developers
 
