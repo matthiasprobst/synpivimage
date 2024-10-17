@@ -21,22 +21,39 @@ al. (https://doi.org/10.1007/978-3-319-68852-7)).
 
 Clone the repository
 
-```bash
+```cmd
 git clone https://github.com/matthiasprobst/synpivimage
 ```
 
 Then navigate into the repo directory and install the package:
 
-```bash
+```cmd
 cd synpivimage/
 pip install .
 ```
 
-For development adjust the installation to:
+For **development** adjust the installation to:
 
-```bash
+```cmd
 pip install -e .
 ```
+
+**Other installation options:**
+For running tests:
+    
+```cmd
+pip install .[test]
+```
+
+For using the GUI:
+```cmd
+pip install .[gui]
+```
+
+For installing everything:
+```cmd
+pip install .[all]
+``` 
 
 ### Via pypi
 

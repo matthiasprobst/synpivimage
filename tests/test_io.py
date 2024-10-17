@@ -44,9 +44,9 @@ class TestIO(unittest.TestCase):
                          2)
         self.assertEqual(loaded_laser.hasParameter[0].label,
                          'width')
-        self.assertEqual(str(loaded_laser.hasParameter[0].hasStandardName),
+        self.assertEqual(str(loaded_laser.hasParameter[0].standard_name),
                          'https://matthiasprobst.github.io/pivmeta#model_laser_sheet_thickness')
-        self.assertEqual(loaded_laser.hasParameter[0].hasNumericalValue,
+        self.assertEqual(loaded_laser.hasParameter[0].value,
                          gauss_laser.width)
 
         (__this_dir__ / 'laser.json').unlink(missing_ok=True)
