@@ -17,11 +17,30 @@ al. (https://doi.org/10.1007/978-3-319-68852-7)).
 
 ## Installation
 
-Navigate to the repository folder and run
+### Manual installation
+
+Clone the repository
 
 ```bash
-pip install synpivimage
+git clone https://github.com/matthiasprobst/synpivimage
 ```
+
+Then navigate into the repo directory and install the package:
+
+```bash
+cd synpivimage/
+pip install .
+```
+
+For development adjust the installation to:
+
+```bash
+pip install -e .
+```
+
+### Via pypi
+
+*Not yet available*
 
 ## Documentation
 
