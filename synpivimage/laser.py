@@ -4,7 +4,8 @@ from typing import Union
 
 import matplotlib.pyplot as plt
 import numpy as np
-from ontolutils.namespacelib import PIVMETA, QUDT_UNIT
+from ontolutils.namespacelib import QUDT_UNIT
+from pivmetalib import PIVMETA
 from pydantic import BaseModel
 
 from .codemeta import get_package_meta
