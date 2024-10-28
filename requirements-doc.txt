@@ -1,6 +1,5 @@
 -e .
 -r requirements.txt
-jupyterlab
 sphinx >= 4.5.0
 sphinx_book_theme
 sphinx-copybutton
@@ -11,4 +10,4 @@ myst-nb
 nbsphinx
 sphinxcontrib-bibtex
 sphinx-math-dollar
-h5rdmtoolbox @ git+https://github.com/matthiasprobst/h5RDMtoolbox@main
+h5rdmtoolbox==1.5.0
