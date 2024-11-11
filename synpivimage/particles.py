@@ -215,12 +215,40 @@ class Particles(Component):
         self._flag = np.zeros_like(self.x, dtype=int)
 
     @classmethod
-    def generate(cls, ppp: float, dx_max, dy_max, dz_max, size, camera, laser) -> "Particles":
+    def generate(
+            cls,
+            ppp: float,
+            dx_max: float,
+            dy_max: float,
+            dz_max: float,
+            size: float,
+            camera: "Camera",
+            laser: "Laser"
+    ) -> "Particles":
         """Generate particles based on a certain ppp (particles per pixel). With
         dx, dy, dz the maximum displacement of the particles can be set. The camera and laser
-        are used to determine the sensor size and the laser width."""
+        are used to determine the sensor size and the laser width.
+
+        Parameters
+        ----------
+        ppp : float
+            Particles per pixel
+        dx_max : float
+            Maximum displacement in x-direction
+        dy_max : float
+            Maximum displacement in y-direction
+        dz_max : float
+            Maximum displacement in z-direction
+        size : float
+            Particle size
+        camera : Camera
+            Camera model
+        laser : Laser
+            Laser model
+        """
         from .utils import generate_particles
-        return generate_particles(ppp=ppp, dx_max=dx_max, dy_max=dy_max, dz_max=dz_max, size=size, camera=camera, laser=laser)
+        return generate_particles(ppp=ppp, dx_max=dx_max, dy_max=dy_max, dz_max=dz_max, size=size, camera=camera,
+                                  laser=laser)
 
     def get_ppp(self, camera_size: int) -> float:
         """Return the particles per pixel"""
