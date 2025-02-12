@@ -3,7 +3,7 @@ import unittest
 
 import h5py
 import numpy as np
-from pivmetalib.pivmeta import LaserModel
+from pivmetalib.pivmeta import VirtualLaser
 
 import synpivimage
 from synpivimage.camera import Camera
@@ -33,9 +33,9 @@ class TestIO(unittest.TestCase):
         )
         gauss_laser_filename = gauss_laser.save_jsonld(__this_dir__ / 'laser.json')
 
-        loaded_laser = LaserModel.from_jsonld(gauss_laser_filename)[0]
+        loaded_laser = VirtualLaser.from_jsonld(gauss_laser_filename)[0]
 
-        self.assertIsInstance(loaded_laser, LaserModel)
+        self.assertIsInstance(loaded_laser, VirtualLaser)
 
         with open(__this_dir__ / 'laser2.json', 'w') as f:
             f.write(loaded_laser.model_dump_jsonld())
@@ -44,9 +44,9 @@ class TestIO(unittest.TestCase):
                          2)
         self.assertEqual(loaded_laser.hasParameter[0].label,
                          'width')
-        self.assertEqual(str(loaded_laser.hasParameter[0].standard_name),
-                         'https://matthiasprobst.github.io/pivmeta#model_laser_sheet_thickness')
-        self.assertEqual(loaded_laser.hasParameter[0].value,
+        self.assertEqual(loaded_laser.hasParameter[0].hasStandardName.standardName,
+                         'model_laser_sheet_thickness')
+        self.assertEqual(loaded_laser.hasParameter[0].hasNumericalValue,
                          gauss_laser.width)
 
         (__this_dir__ / 'laser.json').unlink(missing_ok=True)

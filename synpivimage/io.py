@@ -9,7 +9,7 @@ import cv2
 import numpy as np
 from ontolutils import query
 from ontolutils.classes.utils import split_URIRef
-from pivmetalib.pivmeta import LaserModel, DigitalCameraModel
+from pivmetalib.pivmeta import VirtualLaser, VirtualCamera
 
 from .camera import Camera
 from .laser import Laser
@@ -381,7 +381,7 @@ class HDF5Writer(Writer):
 
         for cmp_name, cmp, onto_model in zip(('laser', 'camera'),
                                              (self.laser, self.camera),
-                                             (LaserModel, DigitalCameraModel)):
+                                             (VirtualLaser, VirtualCamera)):
 
             if cmp:
                 laser_jsonld = cmp.model_dump_jsonld()
@@ -418,7 +418,10 @@ class HDF5Writer(Writer):
                                 if n == 'UNITLESS':
                                     ds.attrs[model_field] = '-'
                                 else:
-                                    ds.attrs[str(model_field)] = n
+                                    if model_field == "hasStandardName":
+                                        ds.attrs[str(model_field)] = n.standardName
+                                    else:
+                                        ds.attrs[str(model_field)] = n
 
         self._h5.close()
         self._h5 = None

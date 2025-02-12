@@ -5,8 +5,10 @@ from typing import Union
 import matplotlib.pyplot as plt
 import numpy as np
 from ontolutils.namespacelib import QUDT_UNIT
-from pivmetalib import PIVMETA
+from pivmetalib import PIV as PIVMETA
+from ssnolib.m4i import NumericalVariable
 from pydantic import BaseModel
+from ssnolib.ssno import StandardName
 
 from .codemeta import get_package_meta
 from .component import Component, load_jsonld
@@ -127,19 +129,19 @@ class Laser(BaseModel, Component):
         except ImportError:
             raise ImportError("Please install `pivmetalib` to use this function: `pip install pivmetalib`")
 
-        laser = pivmeta.LaserModel(
+        laser = pivmeta.VirtualLaser(
             hasParameter=[
-                pivmeta.NumericalVariable(
+                NumericalVariable(
                     label='width',
                     hasNumericalValue=self.width,
-                    hasStandardName=PIVMETA.model_laser_sheet_thickness,
+                    hasStandardName=StandardName(standardName="model_laser_sheet_thickness", unit='m'),
                     hasUnit='mm',
                     hasKindOfQuantity=QUDT_UNIT.MilliM,  # 'https://qudt.org/vocab/unit/MilliM',
                     hasVariableDescription='Laser width'),
-                pivmeta.NumericalVariable(
+                NumericalVariable(
                     label='shape_factor',
                     hasNumericalValue=self.shape_factor,
-                    hasStandardName=PIVMETA.model_laser_sheet_shape_factor,
+                    hasStandardName=StandardName(standardName="model_laser_sheet_shape_factor", unit=''),
                     hasUnit='',
                     hasKindOfQuantity="https://qudt.org/schema/qudt/DimensionlessUnit",
                     hasVariableDescription='The shape factor describes the laser beam shape. A '
@@ -187,7 +189,7 @@ class Laser(BaseModel, Component):
         List[Laser]
             List of laser objects
         """
-        return load_jsonld(cls, 'pivmeta:LaserModel', filename)
+        return load_jsonld(cls, 'pivmeta:VirtualLaser', filename)
 
 
 class GaussShapeLaser(Laser):

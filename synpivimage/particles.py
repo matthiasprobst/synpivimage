@@ -334,44 +334,44 @@ class Particles(Component):
             self.image_quantized_electrons == 0) else self.image_quantized_electrons
 
         hasParameter = [
-            m4i.variable.NumericalVariable(
+            m4i.NumericalVariable(
                 label='x',
                 hasNumericalValue=self.x.astype("float16").tolist()
             ),
-            m4i.variable.NumericalVariable(
+            m4i.NumericalVariable(
                 label='y',
                 hasNumericalValue=self.y.astype("float16").tolist()
             ),
-            m4i.variable.NumericalVariable(
+            m4i.NumericalVariable(
                 label='z',
                 hasNumericalValue=self.z.astype("float16").tolist()
             ),
-            m4i.variable.NumericalVariable(
+            m4i.NumericalVariable(
                 label='size',
                 hasNumericalValue=self.size.astype("float16").tolist()
             ),
-            m4i.variable.NumericalVariable(
+            m4i.NumericalVariable(
                 label='flag',
                 hasNumericalValue=self.flag.astype("uint8").tolist()
             ),
-            m4i.variable.NumericalVariable(
+            m4i.NumericalVariable(
                 label='source_intensity',
                 hasNumericalValue=np.asarray(source_intensity, dtype="uint16").tolist()
             ),
-            m4i.variable.NumericalVariable(
+            m4i.NumericalVariable(
                 label='max_image_photons',
                 hasNumericalValue=np.asarray(max_image_photons, dtype="uint16").tolist()
             ),
-            m4i.variable.NumericalVariable(
+            m4i.NumericalVariable(
                 label='image_electrons',
                 hasNumericalValue=np.asarray(image_electrons, dtype="uint16").tolist()
             ),
-            m4i.variable.NumericalVariable(
+            m4i.NumericalVariable(
                 label='image_quantized_electrons',
                 hasNumericalValue=np.asarray(image_quantized_electrons, dtype="uint16").tolist()
             ),
         ]
-        particles = pivmeta.SyntheticParticle(
+        particles = pivmeta.SyntheticPIVParticle(
             hasSourceCode=get_package_meta(),
             hasParameter=hasParameter
         )

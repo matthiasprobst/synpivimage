@@ -3,7 +3,10 @@ from typing import Tuple, Union, Optional
 
 import numpy as np
 from ontolutils.namespacelib import QUDT_UNIT, QUDT_KIND
+from pivmetalib import PIVMETA
+from pivmetalib.m4i import NumericalVariable
 from pydantic import BaseModel
+from ssnolib.ssno import StandardName
 from typing_extensions import Annotated
 
 from . import noise
@@ -119,36 +122,29 @@ class Camera(BaseModel, Component):
         from pivmetalib import m4i
         from .codemeta import get_package_meta
 
-        def _build_iri(sn: str):
-            if sn:
-                if sn.startswith('http'):
-                    return sn
-                return f"https://matthiasprobst.github.io/pivmeta#{sn}"
-            return None
-
         def _build_variable(value, standard_name=None, unit=None, qkind=None, label=None, description=None):
             kwargs = {'hasNumericalValue': value}
             if label:
                 kwargs['label'] = label
             if standard_name:
-                kwargs['hasStandardName'] = _build_iri(standard_name)
+                kwargs['hasStandardName'] = standard_name
             if unit:
                 kwargs['hasUnit'] = unit
             if qkind:
                 kwargs['hasKindOfQuantity'] = qkind
             if description:
                 kwargs['hasVariableDescription'] = description
-            return pivmeta.NumericalVariable(
+            return NumericalVariable(
                 **kwargs
             )
 
         sn_dict = {
-            'nx': 'sensor_pixel_width',
-            'ny': 'sensor_pixel_height',
-            'bit_depth': '',
-            'fill_ratio_x': 'sensor_pixel_width_fill_factor',
-            'fill_ratio_y': 'sensor_pixel_height_fill_factor',
-            'particle_image_diameter': 'image_particle_diameter'
+            'nx': StandardName(standardName='sensor_pixel_width', unit=QUDT_UNIT.PIXEL),
+            'ny': StandardName(standardName='sensor_pixel_height', unit=QUDT_UNIT.PIXEL),
+            'bit_depth': StandardName(standardName='sensor_bit_depth', unit=QUDT_UNIT.BIT),
+            'fill_ratio_x': StandardName(standardName='sensor_pixel_width_fill_factor', unit=QUDT_UNIT.UNITLESS),
+            'fill_ratio_y': StandardName(standardName='sensor_pixel_height_fill_factor', unit=QUDT_UNIT.UNITLESS),
+            'particle_image_diameter': StandardName(standardName='image_particle_diameter', unit=QUDT_UNIT.M)
         }
         descr_dict = {
             'qe': 'quantum efficiency',
@@ -182,10 +178,10 @@ class Camera(BaseModel, Component):
             )
         shot_noise_txt_value = 'true' if shot_noise else 'false'
         hasParameter.append(
-            m4i.variable.TextVariable(label='shot_noise',
+            m4i.TextVariable(label='shot_noise',
                                       hasStringValue=shot_noise_txt_value)
         )
-        camera = pivmeta.DigitalCameraModel(
+        camera = pivmeta.VirtualCamera(
             hasSourceCode=get_package_meta(),
             hasParameter=hasParameter
         )
@@ -224,4 +220,4 @@ class Camera(BaseModel, Component):
         List[Camera]
             List of camera objects
         """
-        return load_jsonld(cls, 'pivmeta:DigitalCameraModel', filename)
+        return load_jsonld(cls, 'pivmeta:VirtualCamera', filename)
