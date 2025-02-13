@@ -40,7 +40,8 @@ class Imwriter(Writer):
         imwriter.writeB(imgB, particles=particlesB)
     """
 
-    def __init__(self, case_name: str,
+    def __init__(self,
+                 case_name: str,
                  image_dir: Optional[Union[str, pathlib.Path]] = None,
                  suffix: str = '.tif',
                  overwrite: bool = False,

@@ -115,7 +115,7 @@ with synpivimage.Imwriter(case_name="test_case",
     iw.writeA(0, imgA, partA)
     iw.writeB(0, imgB, partB)
 
-with synpivimage.HDF5Writer(case_name="test_case",
+with synpivimage.HDF5Writer(filename='data.hdf',
                             n_images=1,
                             camera=cam,
                             laser=laser) as hw:
