@@ -6,6 +6,7 @@ from typing import Literal
 from typing import Union, Optional
 
 import cv2
+import h5py
 import numpy as np
 from ontolutils import query
 from ontolutils.classes.utils import split_URIRef
@@ -219,7 +220,7 @@ class HDF5Writer(Writer):
         self._h5 = h5py.File(self.filename, 'w')
         return self
 
-    def _get_dsimgA(self) -> "h5py.Dataset":
+    def _get_dsimgA(self) -> h5py.Dataset:
         """Get or create the dataset for image A"""
         ds_nameA = "images/img_A"
         if ds_nameA in self._h5:
