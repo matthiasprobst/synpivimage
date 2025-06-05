@@ -4,12 +4,11 @@
   "license": "https://spdx.org/licenses/MIT",
   "codeRepository": "https://github.com/MatthiasProbst/synpivimage",
   "name": "synpivimage",
-  "version": "1.0.0a8",
+  "version": "1.0.0a9",
   "description": "Tool to build synthetic Particle Image Velocimetry (PIV) images",
   "applicationCategory": "Engineering",
   "programmingLanguage": [
     "Python 3",
-    "Python 3.8",
     "Python 3.9",
     "Python 3.10",
     "Python 3.11",
