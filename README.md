@@ -2,9 +2,9 @@
 
 ![Tests](https://github.com/matthiasprobst/synpivimage/actions/workflows/tests.yml/badge.svg)
 ![DOCS](https://codecov.io/gh/matthiasprobst/synpivimage/branch/dev/graph/badge.svg)
-![pyvers](https://img.shields.io/badge/python-3.8%20%7C%203.9%20%7C%203.10%20%7C%203.11%20%7C%203.12-blue)
+![pyvers](https://img.shields.io/badge/python-%203.9%20%7C%203.10%20%7C%203.11%20%7C%203.12-blue)
 
-This tool let's you generate synthetic Particle Image Velocimetry (PIV) images based on methods described in
+This tool lets you generate synthetic Particle Image Velocimetry (PIV) images based on methods described in
 literature (mainly based on "Particle Image Velocimetry: A Practical Guide" by Raffel et
 al. (https://doi.org/10.1007/978-3-319-68852-7)).
 
