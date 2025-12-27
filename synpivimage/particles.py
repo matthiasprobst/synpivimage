@@ -3,12 +3,14 @@ import logging
 import pathlib
 from copy import deepcopy
 from dataclasses import dataclass
-from typing import Tuple
-from typing import Union, Dict, Optional, List
+from typing import Tuple, Union, Dict, Optional, List
+
 
 import numpy as np
 import scipy
 
+from pivmetalib import pivmeta
+from ssnolib.m4i import NumericalVariable
 from .component import Component
 
 SQRT2 = np.sqrt(2)
@@ -322,8 +324,6 @@ class Particles(Component):
                 'flag': self.flag.tolist()}
 
     def save_jsonld(self, filename: Union[str, pathlib.Path]):
-        from pivmetalib import pivmeta
-        from pivmetalib import m4i
         from .codemeta import get_package_meta
         filename = pathlib.Path(filename)  # .with_suffix('.jsonld')
 
@@ -334,39 +334,39 @@ class Particles(Component):
             self.image_quantized_electrons == 0) else self.image_quantized_electrons
 
         hasParameter = [
-            m4i.NumericalVariable(
+            NumericalVariable(
                 label='x',
                 hasNumericalValue=self.x.astype("float16").tolist()
             ),
-            m4i.NumericalVariable(
+            NumericalVariable(
                 label='y',
                 hasNumericalValue=self.y.astype("float16").tolist()
             ),
-            m4i.NumericalVariable(
+            NumericalVariable(
                 label='z',
                 hasNumericalValue=self.z.astype("float16").tolist()
             ),
-            m4i.NumericalVariable(
+            NumericalVariable(
                 label='size',
                 hasNumericalValue=self.size.astype("float16").tolist()
             ),
-            m4i.NumericalVariable(
+            NumericalVariable(
                 label='flag',
                 hasNumericalValue=self.flag.astype("uint8").tolist()
             ),
-            m4i.NumericalVariable(
+            NumericalVariable(
                 label='source_intensity',
                 hasNumericalValue=np.asarray(source_intensity, dtype="uint16").tolist()
             ),
-            m4i.NumericalVariable(
+            NumericalVariable(
                 label='max_image_photons',
                 hasNumericalValue=np.asarray(max_image_photons, dtype="uint16").tolist()
             ),
-            m4i.NumericalVariable(
+            NumericalVariable(
                 label='image_electrons',
                 hasNumericalValue=np.asarray(image_electrons, dtype="uint16").tolist()
             ),
-            m4i.NumericalVariable(
+            NumericalVariable(
                 label='image_quantized_electrons',
                 hasNumericalValue=np.asarray(image_quantized_electrons, dtype="uint16").tolist()
             ),

@@ -10,8 +10,8 @@ opencv-python
 PyQt5
 scipy
 pydantic
-ontolutils >= 0.13.3
-ssnolib>=1.5.1.0
+ontolutils>=0.27.0,<0.28.0
+ssnolib==2.2.0.3
 pivmetalib>=2.0.0.1
 pivimage
 pint

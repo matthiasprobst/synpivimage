@@ -6,8 +6,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 from ontolutils.namespacelib import QUDT_UNIT
 from pivmetalib import PIV as PIVMETA
-from ssnolib.m4i import NumericalVariable
+from pivmetalib import pivmeta
 from pydantic import BaseModel
+from ssnolib.m4i import NumericalVariable
 from ssnolib.ssno import StandardName
 
 from .codemeta import get_package_meta
@@ -124,11 +125,6 @@ class Laser(BaseModel, Component):
 
     def model_dump_jsonld(self) -> str:
         """Return JSON-LD string representation"""
-        try:
-            from pivmetalib import pivmeta
-        except ImportError:
-            raise ImportError("Please install `pivmetalib` to use this function: `pip install pivmetalib`")
-
         laser = pivmeta.VirtualLaser(
             hasParameter=[
                 NumericalVariable(
