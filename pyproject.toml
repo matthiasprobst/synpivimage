@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "synpivimage"
-version = "1.0.0a9"
+version = "1.0.0a10"
 authors = [
     {name = "Matthias Probst", email = "matth.probst@gmail.com"},
 ]
@@ -62,7 +62,7 @@ doc = [
     "nbsphinx",
     "sphinxcontrib-bibtex",
     "sphinx-math-dollar",
-    "h5rdmtoolbox>=1.5.0",
+    "h5rdmtoolbox>=2.5.4,<3.0.0",
     "xmltodict",
 ]
 dev = [
