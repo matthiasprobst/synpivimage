@@ -59,3 +59,6 @@ docs/getting_started/single_img/*.json
 docs/jupyter_execute
 docs/generated
 docs/_build/*
+
+.coverage
+AGENTS.md
