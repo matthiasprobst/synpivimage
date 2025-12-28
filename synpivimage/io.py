@@ -8,9 +8,11 @@ from typing import Union, Optional
 import cv2
 import h5py
 import numpy as np
+from ontolutils import LangString
 from ontolutils import query
-from ontolutils.classes.utils import split_URIRef
+from ontolutils.classes.utils import split_uri
 from pivmetalib.pivmeta import VirtualLaser, VirtualCamera
+from ssnolib import StandardName
 
 from .camera import Camera
 from .laser import Laser
@@ -389,7 +391,7 @@ class HDF5Writer(Writer):
                 laser_jsonld = cmp.model_dump_jsonld()
 
                 model = None
-                models = query(onto_model, data=laser_jsonld)
+                models = query(onto_model, data=laser_jsonld, format="json-ld")
                 try:
                     model = models[0]
                 except KeyError:
@@ -416,14 +418,37 @@ class HDF5Writer(Writer):
                             if isinstance(attr_val, (int, float)):
                                 ds.attrs[str(model_field)] = attr_val
                             else:
-                                ns, n = split_URIRef(attr_val)
-                                if n == 'UNITLESS':
-                                    ds.attrs[model_field] = '-'
-                                else:
-                                    if model_field == "hasStandardName":
-                                        ds.attrs[str(model_field)] = n.standardName
+                                if isinstance(attr_val, str):
+                                    if attr_val.startswith("http"):
+                                        ns, n = split_uri(attr_val)
+                                        if n == 'UNITLESS':
+                                            ds.attrs[model_field] = '-'
+                                        else:
+                                            if model_field == "hasStandardName":
+                                                ds.attrs[str(model_field)] = n.standardName
+                                            else:
+                                                ds.attrs[str(model_field)] = n
                                     else:
-                                        ds.attrs[str(model_field)] = n
+                                        ds.attrs[str(model_field)] = attr_val
+                                elif isinstance(attr_val, StandardName):
+                                    ds.attrs["standard_name"] = str(attr_val.standardName)
+                                    ds.attrs["units"] = str(attr_val.unit)
+                                else:
+                                    if isinstance(attr_val, LangString):
+                                        if attr_val.lang:
+                                            ds.attrs[str(model_field)] = f"{attr_val.value}@{attr_val.lang}"
+                                        else:
+                                            ds.attrs[str(model_field)] = str(attr_val)
+                                    else:
+                                        ds.attrs[str(model_field)] = attr_val
+                                # ns, n = split_uri(attr_val)
+                                # if n == 'UNITLESS':
+                                #     ds.attrs[model_field] = '-'
+                                # else:
+                                #     if model_field == "hasStandardName":
+                                #         ds.attrs[str(model_field)] = n.standardName
+                                #     else:
+                                #         ds.attrs[str(model_field)] = n
 
         self._h5.close()
         self._h5 = None

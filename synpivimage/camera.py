@@ -2,10 +2,11 @@ import pathlib
 from typing import Tuple, Union, Optional
 
 import numpy as np
+from ontolutils.ex.m4i import TextVariable
 from ontolutils.namespacelib import QUDT_UNIT, QUDT_KIND
-from pivmetalib import PIVMETA
-from pivmetalib.m4i import NumericalVariable
+from pivmetalib import pivmeta
 from pydantic import BaseModel
+from ssnolib.m4i import NumericalVariable
 from ssnolib.ssno import StandardName
 from typing_extensions import Annotated
 
@@ -118,8 +119,6 @@ class Camera(BaseModel, Component):
 
     def model_dump_jsonld(self) -> str:
         """Return JSON-LD str"""
-        from pivmetalib import pivmeta
-        from pivmetalib import m4i
         from .codemeta import get_package_meta
 
         def _build_variable(value, standard_name=None, unit=None, qkind=None, label=None, description=None):
@@ -178,8 +177,8 @@ class Camera(BaseModel, Component):
             )
         shot_noise_txt_value = 'true' if shot_noise else 'false'
         hasParameter.append(
-            m4i.TextVariable(label='shot_noise',
-                                      hasStringValue=shot_noise_txt_value)
+            TextVariable(label='shot_noise',
+                         hasStringValue=shot_noise_txt_value)
         )
         camera = pivmeta.VirtualCamera(
             hasSourceCode=get_package_meta(),

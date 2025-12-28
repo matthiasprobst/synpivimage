@@ -6,7 +6,10 @@ on:
   push:
     branches:
       - main
-      - dev
+      - dev/*
+      - dev*
+      - fix/*
+      - fix*
 
 jobs:
   test:
@@ -30,7 +33,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install setuptools>=78.1.1
-          pip install -r requirements-dev.txt
+          pip install -e .[test,dev]
 
       - name: Run pytest coverage
         run: pytest --cov --cov-report=xml

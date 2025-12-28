@@ -21,6 +21,8 @@ for h in logger.handlers:
 class TestLaser(unittest.TestCase):
 
     def test_save_load_camera(self):
+
+
         laser = Laser(
             width=0.25,
             shape_factor=2
