@@ -36,7 +36,7 @@ dependencies = [
     "pydantic",
     "ontolutils>=0.27.0,<0.28.0",
     "ssnolib==2.2.0.3",
-    "pivmetalib>=3.1.0.1",
+    "pivmetalib>=3.1.0.1,<3.1.1.0",
     "pivimage",
     "pint",
 ]
@@ -62,7 +62,7 @@ doc = [
     "nbsphinx",
     "sphinxcontrib-bibtex",
     "sphinx-math-dollar",
-    "h5rdmtoolbox>=2.5.4,<3.0.0",
+    "h5rdmtoolbox>=2.5.4,<2.6.0",
     "xmltodict",
 ]
 dev = [
