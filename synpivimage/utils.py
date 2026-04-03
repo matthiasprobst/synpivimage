@@ -52,7 +52,7 @@ def generate_particles(ppp: float,
     """
 
     iter_max = kwargs.get('iter_max', 40)
-    N_max = kwargs.get('N_ma', 10 ** 7)
+    N_max = kwargs.get('N_max', 10 ** 7)
 
     logger.debug(f'Generating particles with a ppp of {ppp}')
     assert 0 < ppp < 1, f"Expected ppp to be between 0 and 1, got {ppp}"

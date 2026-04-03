@@ -10,10 +10,11 @@
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
-import os
+from pathlib import Path
 import sys
 
-sys.path.insert(0, os.path.abspath('../..'))
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(PROJECT_ROOT))
 
 # -- Project information -----------------------------------------------------
 
@@ -34,18 +35,10 @@ extensions = ['sphinx.ext.autodoc',
               "IPython.sphinxext.ipython_directive",
               "IPython.sphinxext.ipython_console_highlighting",
               "sphinx_copybutton",
-              "nbsphinx",
               "sphinx_math_dollar",
               "sphinx.ext.mathjax",
               "sphinx_design",
               "myst_nb", ]
-mathjax_config = {
-    'tex2jax': {
-        'inlineMath': [ ["\\(","\\)"] ],
-        'displayMath': [["\\[","\\]"] ],
-    },
-}
-
 mathjax3_config = {
   "tex": {
     "inlineMath": [['\\(', '\\)']],
@@ -59,7 +52,7 @@ napoleon_use_param = False
 napoleon_use_rtype = False
 napoleon_preprocess_types = True
 
-nbsphinx_allow_errors = True
+nb_execution_mode = "off"
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -67,7 +60,16 @@ templates_path = ['_templates']
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path.
-exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store', 'tests', '**.ipynb_checkpoints', 'colab', 'README.md']
+exclude_patterns = [
+    '_build',
+    'Thumbs.db',
+    '.DS_Store',
+    'tests',
+    '**.ipynb_checkpoints',
+    'colab',
+    'README.md',
+    'jupyter_execute',
+]
 
 autodoc_member_order = 'bysource'
 
@@ -103,8 +105,6 @@ html_theme_options = dict(
     use_download_button=True,
     use_issues_button=True,
     home_page_in_toc=False,
-    extra_navbar="",
-    navbar_footer_text="",
 )
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,

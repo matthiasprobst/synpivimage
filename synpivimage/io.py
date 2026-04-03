@@ -3,10 +3,9 @@ import pathlib
 import shutil
 import warnings
 from typing import Literal
-from typing import Union, Optional
+from typing import TYPE_CHECKING, Union, Optional
 
 import cv2
-import h5py
 import numpy as np
 from ontolutils import LangString
 from ontolutils import query
@@ -17,6 +16,9 @@ from ssnolib import StandardName
 from .camera import Camera
 from .laser import Laser
 from .particles import Particles
+
+if TYPE_CHECKING:
+    import h5py
 
 Format = Literal['json', 'json-ld']
 
@@ -207,119 +209,89 @@ class HDF5Writer(Writer):
         self.overwrite = overwrite
         self.camera = camera
         self.laser = laser
-        self._h5 = None
+        self._h5: Optional["h5py.File"] = None
         self._n_images = n_images
 
-    def __enter__(self, n_imgs: Optional[int] = None):
+    def __enter__(self):
         if self.filename.exists() and not self.overwrite:
             raise FileExistsError(f"File {self.filename} exists and overwrite is False")
         if self.filename.exists() and self.overwrite:
             self.filename.unlink()
         try:
             import h5py
-        except ImportError:
-            raise ImportError("h5py is required for HDF5Writer")
+        except ImportError as exc:
+            raise ImportError("h5py is required for HDF5Writer") from exc
         self._h5 = h5py.File(self.filename, 'w')
         return self
 
-    def _get_dsimgA(self) -> h5py.Dataset:
+    def _require_open_file(self):
+        if self._h5 is None:
+            raise RuntimeError("HDF5Writer is not enabled. Use it as a context manager.")
+        return self._h5
+
+    def _get_dsimgA(self) -> "h5py.Dataset":
         """Get or create the dataset for image A"""
+        h5file = self._require_open_file()
         ds_nameA = "images/img_A"
-        if ds_nameA in self._h5:
-            return self._h5[ds_nameA]
-        return self._h5.create_dataset(ds_nameA,
-                                       shape=(self._n_images, self.camera.ny, self.camera.nx),
-                                       maxshape=(self._n_images, self.camera.ny, self.camera.nx),
-                                       dtype='uint16')
+        if ds_nameA in h5file:
+            return h5file[ds_nameA]
+        return h5file.create_dataset(
+            ds_nameA,
+            shape=(self._n_images, self.camera.ny, self.camera.nx),
+            maxshape=(self._n_images, self.camera.ny, self.camera.nx),
+            dtype='uint16'
+        )
 
     def _get_dsimgB(self) -> "h5py.Dataset":
         """Get or create the dataset for image A"""
+        h5file = self._require_open_file()
         ds_nameA = "images/img_B"
-        if ds_nameA in self._h5:
-            return self._h5[ds_nameA]
-        return self._h5.create_dataset(ds_nameA,
-                                       shape=(self._n_images, self.camera.ny, self.camera.nx),
-                                       maxshape=(self._n_images, self.camera.ny, self.camera.nx),
-                                       dtype='uint16')
+        if ds_nameA in h5file:
+            return h5file[ds_nameA]
+        return h5file.create_dataset(
+            ds_nameA,
+            shape=(self._n_images, self.camera.ny, self.camera.nx),
+            maxshape=(self._n_images, self.camera.ny, self.camera.nx),
+            dtype='uint16'
+        )
 
     def _write_particles(self, index: int, ab: str, particles):
         """Write particles to HDF. data to write:
         x,y,z,size,source_intensity,max_image_photons,image_electrons,image_quantized_electrons,flag
 
         """
+        h5file = self._require_open_file()
         particle_group = f'particles/{ab}'
         n = len(particles)
-        if particle_group not in self._h5:
-            gr = self._h5.create_group(particle_group)
+        if particle_group not in h5file:
+            gr = h5file.create_group(particle_group)
             ds_shape = (self._n_images, n)
-            ds = gr.create_dataset('x', shape=ds_shape, maxshape=(None, n), dtype='float32')
-            ds[0, :] = particles.x
-            ds = gr.create_dataset('y', shape=ds_shape, maxshape=(None, n), dtype='float32')
-            ds[0, :] = particles.y
-            ds = gr.create_dataset('z', shape=ds_shape, maxshape=(None, n), dtype='float32')
-            ds[0, :] = particles.z
-            ds = gr.create_dataset('size', shape=ds_shape, maxshape=(None, n), dtype='float32')
-            ds[0, :] = particles.size
-            ds = gr.create_dataset('source_intensity', shape=ds_shape, maxshape=(None, n), dtype='float32')
-            ds[0, :] = particles.source_intensity
-            ds = gr.create_dataset('max_image_photons', shape=ds_shape, maxshape=(None, n), dtype='float32')
-            ds[0, :] = particles.max_image_photons
-            ds = gr.create_dataset('image_electrons', shape=ds_shape, maxshape=(None, n), dtype='float32')
-            ds[0, :] = particles.image_electrons
-            ds = gr.create_dataset('image_quantized_electrons', shape=ds_shape, maxshape=(None, n), dtype='float32')
-            ds[0, :] = particles.image_quantized_electrons
-            ds = gr.create_dataset('flag', shape=ds_shape, maxshape=(None, n), dtype='uint8')
-            ds[0, :] = particles.flag
-            ds.resize((ds.shape[0] + 1, *ds.shape[1:]))
+            gr.create_dataset('x', shape=ds_shape, maxshape=(self._n_images, n), dtype='float32')
+            gr.create_dataset('y', shape=ds_shape, maxshape=(self._n_images, n), dtype='float32')
+            gr.create_dataset('z', shape=ds_shape, maxshape=(self._n_images, n), dtype='float32')
+            gr.create_dataset('size', shape=ds_shape, maxshape=(self._n_images, n), dtype='float32')
+            gr.create_dataset('source_intensity', shape=ds_shape, maxshape=(self._n_images, n), dtype='float32')
+            gr.create_dataset('max_image_photons', shape=ds_shape, maxshape=(self._n_images, n), dtype='float32')
+            gr.create_dataset('image_electrons', shape=ds_shape, maxshape=(self._n_images, n), dtype='float32')
+            gr.create_dataset('image_quantized_electrons', shape=ds_shape, maxshape=(self._n_images, n), dtype='float32')
+            gr.create_dataset('flag', shape=ds_shape, maxshape=(self._n_images, n), dtype='uint8')
 
-            return
+        ds = h5file[particle_group]['x']
+        if index >= ds.shape[0]:
+            raise KeyError(
+                f'Particle index {index} is out of range. Only {ds.shape[0]} images are expected, thus '
+                f'index should be in the range [0, {ds.shape[0] - 1}]'
+            )
 
-        ds = self._h5[particle_group]['x']
-        curr_shape = ds.shape
-
-        if self._n_images is None:
-            ds.resize((curr_shape[0] + 1, *curr_shape[1:]))
-        ds[index, :] = particles.x
-
-        ds = self._h5[particle_group]['y']
-        if self._n_images is None:
-            ds.resize((curr_shape[0] + 1, *curr_shape[1:]))
-        ds[index, :] = particles.y
-
-        ds = self._h5[particle_group]['z']
-        if self._n_images is None:
-            ds.resize((curr_shape[0] + 1, *curr_shape[1:]))
-        ds[index, :] = particles.z
-
-        ds = self._h5[particle_group]['size']
-        if self._n_images is None:
-            ds.resize((curr_shape[0] + 1, *curr_shape[1:]))
-        ds[index, :] = particles.size
-
-        ds = self._h5[particle_group]['source_intensity']
-        if self._n_images is None:
-            ds.resize((curr_shape[0] + 1, *curr_shape[1:]))
-        ds[index, :] = particles.source_intensity
-
-        ds = self._h5[particle_group]['max_image_photons']
-        if self._n_images is None:
-            ds.resize((curr_shape[0] + 1, *curr_shape[1:]))
-        ds[index, :] = particles.max_image_photons
-
-        ds = self._h5[particle_group]['image_electrons']
-        if self._n_images is None:
-            ds.resize((curr_shape[0] + 1, *curr_shape[1:]))
-        ds[index, :] = particles.image_electrons
-
-        ds = self._h5[particle_group]['image_quantized_electrons']
-        if self._n_images is None:
-            ds.resize((curr_shape[0] + 1, *curr_shape[1:]))
-        ds[index, :] = particles.image_quantized_electrons
-
-        ds = self._h5[particle_group]['flag']
-        if self._n_images is None:
-            ds.resize((curr_shape[0] + 1, *curr_shape[1:]))
-        ds[index, :] = particles.flag
+        h5file[particle_group]['x'][index, :] = particles.x
+        h5file[particle_group]['y'][index, :] = particles.y
+        h5file[particle_group]['z'][index, :] = particles.z
+        h5file[particle_group]['size'][index, :] = particles.size
+        h5file[particle_group]['source_intensity'][index, :] = particles.source_intensity
+        h5file[particle_group]['max_image_photons'][index, :] = particles.max_image_photons
+        h5file[particle_group]['image_electrons'][index, :] = particles.image_electrons
+        h5file[particle_group]['image_quantized_electrons'][index, :] = particles.image_quantized_electrons
+        h5file[particle_group]['flag'][index, :] = particles.flag
 
     def writeA(self, index: int, img: np.ndarray, particles: Particles = None):
         """Write image A

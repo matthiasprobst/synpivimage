@@ -10,26 +10,31 @@ from .particles import Particles
 
 __this_dir__ = pathlib.Path(__file__).parent
 
-logging.basicConfig()
-logger = logging.getLogger(__package__)
+logger = logging.getLogger("synpivimage")
 
 _formatter = logging.Formatter(
     '%(asctime)s,%(msecs)d %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',
     datefmt='%Y-%m-%d_%H:%M:%S'
 )
 
-_sh = logging.StreamHandler()
-_sh.setFormatter(_formatter)
-logger.addHandler(_sh)
+def _configure_default_logging() -> None:
+    """Configure package logger once without mutating root logging."""
+    if logger.handlers:
+        return
+    stream_handler = logging.StreamHandler()
+    stream_handler.setFormatter(_formatter)
+    logger.addHandler(stream_handler)
 
 
-def set_loglevel(level):
+def set_loglevel(level: int) -> None:
     """Set the log level"""
+    _configure_default_logging()
     logger.setLevel(level)
     for handler in logger.handlers:
         handler.setLevel(level)
 
 
+_configure_default_logging()
 set_loglevel(logging.INFO)
 
 __all__ = ['__version__', 'Camera', 'take_image', 'Laser', 'Particles', 'set_loglevel']

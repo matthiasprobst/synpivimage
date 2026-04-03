@@ -163,7 +163,7 @@ class Particles(Component):
     def max_image_photons(self, value):
         assert value.ndim == 1, f"Expected 1D array, got {value.ndim}D"
         assert value.size == self.n_particles, f"Expected array of size {self.n_particles}, got {value.size}"
-        self.max_image_photons = value
+        self._max_image_photons = value
 
     @property
     def image_electrons(self):
@@ -174,7 +174,7 @@ class Particles(Component):
     def image_electrons(self, value):
         assert value.ndim == 1, f"Expected 1D array, got {value.ndim}D"
         assert value.size == self.n_particles, f"Expected array of size {self.n_particles}, got {value.size}"
-        self.image_electrons = value
+        self._image_electrons = value
 
     @property
     def image_quantized_electrons(self):
@@ -185,7 +185,7 @@ class Particles(Component):
     def image_quantized_electrons(self, value):
         assert value.ndim == 1, f"Expected 1D array, got {value.ndim}D"
         assert value.size == self.n_particles, f"Expected array of size {self.n_particles}, got {value.size}"
-        self.image_quantized_electrons = value
+        self._image_quantized_electrons = value
 
     @property
     def flag(self):
@@ -201,7 +201,7 @@ class Particles(Component):
     def irrad_photons(self, value):
         assert value.ndim == 1, f"Expected 1D array, got {value.ndim}D"
         assert value.size == self.n_particles, f"Expected array of size {self.n_particles}, got {value.size}"
-        self.irrad_photons = value
+        self._source_intensity = value
 
     @property
     def n_particles(self):
@@ -278,7 +278,7 @@ class Particles(Component):
         else:
             self._y = np.random.uniform(*self._ylim, N)
 
-        if self._ylim is None:
+        if self._zlim is None:
             self._z = np.random.uniform(min(self.z), max(self.z), N)
         else:
             self._z = np.random.uniform(*self._zlim, N)
@@ -395,7 +395,10 @@ class Particles(Component):
             they cannot be displaced. Call `synpivimage.take_image` first
         """
         if self.inactive.sum() > 0:
-            raise ValueError("Cannot displace particles if they have been illuminated once, so a image has been taken")
+            raise ValueError(
+                "Cannot displace particles before image generation. "
+                "Call synpivimage.take_image() first."
+            )
 
         if dx is not None:
             new_x = self.x + dx
@@ -420,7 +423,7 @@ class Particles(Component):
     @property
     def inactive(self):
         """Return mask of inactive particles"""
-        return np.asarray(self.flag & ParticleFlag.INACTIVE.value, dtype=bool)
+        return np.asarray(self.flag == ParticleFlag.INACTIVE.value, dtype=bool)
 
     @property
     def active(self):
@@ -509,8 +512,8 @@ class Particles(Component):
         else:
             raise ValueError(f"Size {size} not supported")
         intensity = np.zeros_like(x)  # no intensity by default
-        flag = np.zeros_like(x, dtype=bool)  # disabled by default
-        return cls(x, y, z, size, intensity, flag)
+        flag = np.zeros_like(x, dtype=int)  # inactive by default
+        return cls(x=x, y=y, z=z, size=size, source_intensity=intensity, flag=flag)
 
     def __sub__(self, other: "Particles") -> ParticleDisplacement:
         """Subtract two particle sets"""

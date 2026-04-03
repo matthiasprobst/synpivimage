@@ -2,11 +2,17 @@
 
 ![Tests](https://github.com/matthiasprobst/synpivimage/actions/workflows/tests.yml/badge.svg)
 ![DOCS](https://codecov.io/gh/matthiasprobst/synpivimage/branch/dev/graph/badge.svg)
-![pyvers](https://img.shields.io/badge/python-%203.9%20%7C%203.10%20%7C%203.11%20%7C%203.12-blue)
+![pyvers](https://img.shields.io/badge/python-%203.9%20%7C%203.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue)
 
 This tool lets you generate synthetic Particle Image Velocimetry (PIV) images based on methods described in
 literature (mainly based on "Particle Image Velocimetry: A Practical Guide" by Raffel et
 al. (https://doi.org/10.1007/978-3-319-68852-7)).
+
+## Release status
+
+Current release line: `1.0.0a*` (alpha).  
+Target: stable `1.0.0` with a hardened public API centered around `Camera`, `Laser`, `Particles`,
+`take_image`, `Imwriter`, and `HDF5Writer`.
 
 ## Highlights
 
@@ -52,7 +58,7 @@ pip install .[gui]
 
 For installing everything:
 ```cmd
-pip install .[all]
+pip install .[complete]
 ``` 
 
 ### Via pypi
@@ -138,6 +144,8 @@ Call the following inside the package directory to run the tests (with coverage)
 ```bash
 pytest --cov=synpivimage --cov-report html
 ```
+
+CI also runs `pytest --cov --cov-report=xml` on Ubuntu, macOS, and Windows for Python 3.9-3.13.
 
 ### Contributing
 

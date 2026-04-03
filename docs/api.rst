@@ -21,3 +21,6 @@ Virtual PIV Setup
    synpivimage.laser.Laser.save_jsonld
    synpivimage.laser.Laser.load_jsonld
    synpivimage.particles.Particles
+   synpivimage.core.take_image
+   synpivimage.io.Imwriter
+   synpivimage.io.HDF5Writer
