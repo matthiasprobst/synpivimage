@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="380" viewBox="0 0 1200 380">
+  <defs>
+    <style>
+      .box { fill: #f6f8fa; stroke: #1f2937; stroke-width: 2; rx: 10; ry: 10; }
+      .step { fill: #e8f1ff; stroke: #1d4ed8; stroke-width: 2; rx: 10; ry: 10; }
+      .io { fill: #ecfdf5; stroke: #047857; stroke-width: 2; rx: 10; ry: 10; }
+      .label { font-family: Arial, sans-serif; font-size: 20px; fill: #111827; }
+      .small { font-family: Arial, sans-serif; font-size: 16px; fill: #374151; }
+      .arrow { stroke: #111827; stroke-width: 3; fill: none; marker-end: url(#arrowHead); }
+    </style>
+    <marker id="arrowHead" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+      <polygon points="0,0 10,4 0,8" fill="#111827" />
+    </marker>
+  </defs>
+
+  <rect x="40" y="40" width="230" height="80" class="box" />
+  <text x="60" y="75" class="label">Particles</text>
+  <text x="60" y="102" class="small">x, y, z, size</text>
+
+  <rect x="40" y="145" width="230" height="80" class="box" />
+  <text x="60" y="180" class="label">Laser</text>
+  <text x="60" y="207" class="small">width, shape_factor</text>
+
+  <rect x="40" y="250" width="230" height="80" class="box" />
+  <text x="60" y="285" class="label">Camera</text>
+  <text x="60" y="312" class="small">noise + quantization</text>
+
+  <rect x="340" y="95" width="280" height="95" class="step" />
+  <text x="365" y="136" class="label">take_image(...)</text>
+  <text x="365" y="163" class="small">illumination + projection + sensor model</text>
+
+  <rect x="700" y="80" width="220" height="75" class="io" />
+  <text x="725" y="120" class="label">Image A</text>
+  <rect x="700" y="175" width="220" height="75" class="io" />
+  <text x="725" y="215" class="label">Particles A</text>
+
+  <rect x="970" y="95" width="180" height="95" class="step" />
+  <text x="995" y="136" class="label">displace</text>
+  <text x="995" y="163" class="small">dx, dy, dz</text>
+
+  <rect x="700" y="280" width="220" height="75" class="io" />
+  <text x="725" y="320" class="label">Image B</text>
+  <rect x="970" y="280" width="180" height="75" class="io" />
+  <text x="990" y="320" class="label">Writers</text>
+  <text x="990" y="342" class="small">TIF / HDF5 + metadata</text>
+
+  <path d="M270 80 L340 125" class="arrow" />
+  <path d="M270 185 L340 143" class="arrow" />
+  <path d="M270 290 L340 161" class="arrow" />
+  <path d="M620 128 L700 118" class="arrow" />
+  <path d="M620 160 L700 210" class="arrow" />
+  <path d="M920 118 L970 128" class="arrow" />
+  <path d="M1060 190 L1060 280" class="arrow" />
+  <path d="M790 250 L790 280" class="arrow" />
+</svg>

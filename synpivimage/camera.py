@@ -5,7 +5,7 @@ import numpy as np
 from ontolutils.ex.m4i import TextVariable
 from ontolutils.namespacelib import QUDT_UNIT, QUDT_KIND
 from pivmetalib import pivmeta
-from pydantic import BaseModel
+from pydantic import BaseModel, PrivateAttr
 from ssnolib.m4i import NumericalVariable
 from ssnolib.ssno import StandardName
 from typing_extensions import Annotated
@@ -32,7 +32,13 @@ class Camera(BaseModel, Component):
     fill_ratio_x: FillRatio
     fill_ratio_y: FillRatio
     particle_image_diameter: PositiveFloat
+    focus_plane_z: float = 0.0
+    defocus_strength: float = 0.0
     seed: Optional[int] = None
+    _rs: np.random.RandomState = PrivateAttr()
+
+    def model_post_init(self, __context) -> None:
+        self._rs = np.random.RandomState(self.seed)
 
     @property
     def size(self) -> int:
@@ -67,6 +73,7 @@ class Camera(BaseModel, Component):
         """
         max_adu = self.max_count
         adu = electrons * self.sensitivity
+        adu[adu < 0] = 0
         _saturated_pixels = adu > max_adu
         n_saturated_pixels = np.sum(_saturated_pixels)
 
@@ -87,7 +94,7 @@ class Camera(BaseModel, Component):
                                     self.baseline_noise,
                                     self.dark_noise,
                                     self.qe,
-                                    rs=np.random.RandomState(self.seed)
+                                    rs=self._rs
                                     )
         return electrons
 
@@ -97,20 +104,28 @@ class Camera(BaseModel, Component):
         .. note::
             The definition of the image particle diameter is the diameter of the
             particle image in pixels, where the normalized gaussian is equal to $e^{-2}$,
-            which is a full width of $4 \sigma$.
+            which is a full width of $4 \\sigma$.
 
         Returns image and number of saturated pixels.
         """
-        # active = particles.active
         active = particles.in_fov
+
+        active_particles = particles[active]
+        base_sigma = self.particle_image_diameter / 4
+        defocus_blur = 0.0
+        if self.defocus_strength > 0:
+            z_offset = np.abs(active_particles.z - self.focus_plane_z)
+            defocus_blur = self.defocus_strength * z_offset
+
         irrad_photons, particles.max_image_photons[active] = model_image_particles(
-            particles[active],
+            active_particles,
             nx=self.nx,
             ny=self.ny,
-            sigmax=self.particle_image_diameter / 4,
-            sigmay=self.particle_image_diameter / 4,
+            sigmax=base_sigma,
+            sigmay=base_sigma,
             fill_ratio_x=self.fill_ratio_x,
-            fill_ratio_y=self.fill_ratio_y
+            fill_ratio_y=self.fill_ratio_y,
+            defocus_blur=defocus_blur,
         )
         electrons = self._capture(irrad_photons)
         particles.image_electrons[active] = self._capture(particles.max_image_photons[active])
@@ -148,17 +163,23 @@ class Camera(BaseModel, Component):
         descr_dict = {
             'qe': 'quantum efficiency',
             'dark_noise': 'Dark noise is the standard deviation of a gaussian noise model',
-            'baseline_noise': 'Dark noise is the mean value of a gaussian noise model'
+            'baseline_noise': 'Dark noise is the mean value of a gaussian noise model',
+            'focus_plane_z': 'Position of the in-focus plane along z',
+            'defocus_strength': 'Additional Gaussian blur (px) per z-distance from the focus plane'
         }
         unit_dict = {
             'nx': QUDT_UNIT.UNITLESS,
             'ny': QUDT_UNIT.UNITLESS,
             'bit_depth': QUDT_UNIT.BIT,  # 'http://qudt.org/vocab/unit/BIT',
+            'focus_plane_z': QUDT_UNIT.M,
+            'defocus_strength': QUDT_UNIT.PER_M,
         }
         qkind_dict = {
             'nx': QUDT_KIND.Dimensionless,
             'ny': QUDT_KIND.Dimensionless,
-            'bit_depth': QUDT_KIND.InformationEntropy  # 'http://qudt.org/schema/qudt/CountingUnit'
+            'bit_depth': QUDT_KIND.InformationEntropy,  # 'http://qudt.org/schema/qudt/CountingUnit'
+            'focus_plane_z': QUDT_KIND.Length,
+            'defocus_strength': QUDT_KIND.InverseLength,
         }
 
         hasParameter = []

@@ -1,15 +1,42 @@
-from typing import Tuple
+from typing import Optional, Tuple, Union
 
 import numpy as np
 
-SEED = None
-
-np.random.seed(seed=SEED)
-
-rs = np.random.RandomState(seed=SEED)
+RandomSource = Union[np.random.RandomState, np.random.Generator]
 
 
-def add_noise(irrad_photons, shot_noise, baseline, dark_noise, qe, rs: rs = np.random.RandomState):
+def _as_random_source(rs: Optional[RandomSource]) -> RandomSource:
+    """Return a random source; defaults to NumPy's global generator."""
+    if rs is None:
+        return np.random.default_rng()
+    return rs
+
+
+def _normal(
+    rs: RandomSource,
+    mean: float,
+    std: float,
+    shape: Tuple[int, ...],
+) -> np.ndarray:
+    if isinstance(rs, np.random.RandomState):
+        return rs.normal(mean, std, shape)
+    return rs.normal(mean, std, shape)
+
+
+def _poisson(rs: RandomSource, photons: np.ndarray) -> np.ndarray:
+    if isinstance(rs, np.random.RandomState):
+        return rs.poisson(photons, size=photons.shape)
+    return rs.poisson(photons, size=photons.shape)
+
+
+def add_noise(
+    irrad_photons: np.ndarray,
+    shot_noise: bool,
+    baseline: float,
+    dark_noise: float,
+    qe: float,
+    rs: Optional[RandomSource] = None,
+) -> np.ndarray:
     """
     Add noise to an array of photons
 
@@ -25,9 +52,11 @@ def add_noise(irrad_photons, shot_noise, baseline, dark_noise, qe, rs: rs = np.r
         Dark noise (Standard deviation of the dark noise)
     qe : float
         Quantum efficiency
-    rs : np.random.RandomState
-        Random state for reproducibility
+    rs : Optional[RandomSource]
+        Random source for reproducibility
     """
+    rs = _as_random_source(rs)
+
     if shot_noise:
         shot_noise = compute_shot_noise(irrad_photons, rs)
         # converting to electrons
@@ -35,19 +64,30 @@ def add_noise(irrad_photons, shot_noise, baseline, dark_noise, qe, rs: rs = np.r
     else:
         electrons = qe * irrad_photons
 
-    electrons_out = electrons + compute_dark_noise(baseline, dark_noise, electrons.shape)
+    electrons_out = electrons + compute_dark_noise(
+        baseline,
+        dark_noise,
+        electrons.shape,
+        rs=rs,
+    )
     return electrons_out
 
 
-def compute_dark_noise(mean: float, std: float, shape: Tuple[int, int]) -> np.ndarray:
-    """adds gaussian noise to an array"""
-    # if mean == 0:
-    #     return np.zeros(shape=shape)
-    gnoise = np.random.normal(mean, std, shape)
-    gnoise[gnoise < 0] = 0
-    return gnoise
+def compute_dark_noise(
+    mean: float,
+    std: float,
+    shape: Tuple[int, ...],
+    rs: Optional[RandomSource] = None,
+) -> np.ndarray:
+    """Add Gaussian dark/read noise to an array."""
+    rs = _as_random_source(rs)
+    return _normal(rs, mean, std, shape)
 
 
-def compute_shot_noise(photons: np.ndarray, rs: np.random.RandomState) -> np.ndarray:
+def compute_shot_noise(
+    photons: np.ndarray,
+    rs: Optional[RandomSource] = None,
+) -> np.ndarray:
     """Based on the input photons, compute the poisson (shot noise) and return the noise array"""
-    return rs.poisson(photons, size=photons.shape)
+    rs = _as_random_source(rs)
+    return _poisson(rs, photons)

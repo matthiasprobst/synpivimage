@@ -86,7 +86,7 @@ class Laser(BaseModel, Component):
         logger = kwargs.get('logger', LOGGER)
 
         # the width of a laser is defined as:
-        # intensity drops to 1-e
+        # intensity drops to 1/e
 
         dz0 = SQRT2 * self.width / 2
         s = self.shape_factor
@@ -130,7 +130,7 @@ class Laser(BaseModel, Component):
                 NumericalVariable(
                     label='width',
                     hasNumericalValue=self.width,
-                    hasStandardName=StandardName(standardName="model_laser_sheet_thickness", unit='m'),
+                    hasStandardName=StandardName(standardName="model_laser_sheet_thickness", unit='mm'),
                     hasUnit='mm',
                     hasKindOfQuantity=QUDT_UNIT.MilliM,  # 'https://qudt.org/vocab/unit/MilliM',
                     hasVariableDescription='Laser width'),

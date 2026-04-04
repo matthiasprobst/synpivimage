@@ -57,26 +57,32 @@ def take_image(laser: Laser,
         The updated Particles object
     """
     logger = kwargs.get('logger', LOGGER)
-    # compute the particle intensity factor in order to reach particle_peak_count
-    # For this, call the error function
-    mean_particle_size = np.mean(particles.size)
+    # compute a robust peak-reference intensity for polydisperse particle sets
+    # by evaluating each particle diameter at its center-pixel response.
     max_part_intensity = compute_intensity_distribution(
         x=0,
         y=0,
         xp=0,
         yp=0,
-        dp=mean_particle_size,
+        dp=np.asarray(particles.size),
         sigmax=camera.particle_image_diameter / 4,
         sigmay=camera.particle_image_diameter / 4,
         fill_ratio_x=camera.fill_ratio_x,
         fill_ratio_y=camera.fill_ratio_y
     )
-    intensity_factor = (particle_peak_count + 1) / max_part_intensity / camera.qe / camera.sensitivity
-    # assert int(intensity_factor * max_part_intensity) == 1000
+    reference_peak_intensity = float(np.max(max_part_intensity))
+    if reference_peak_intensity <= 0:
+        raise ValueError("Reference particle peak intensity is non-positive")
+    intensity_factor = (
+        (particle_peak_count + 1)
+        / reference_peak_intensity
+        / camera.qe
+        / camera.sensitivity
+    )
 
     # compute the noise level:
     if camera.shot_noise:
-        sqrtN = np.sqrt(max_part_intensity * intensity_factor)
+        sqrtN = np.sqrt(reference_peak_intensity * intensity_factor)
     else:
         sqrtN = 0
 
@@ -105,16 +111,22 @@ def take_image(laser: Laser,
     # the dark noise should not be greater that the particle intensity, otherwise the particle will not be visible
     # the total particle intensity is the baseline noise + the particle intensity + the shot noise (if enabled)
     # + the dark noise.
-    illumination_threshold = max(NSIGMA_NOISE_THRESHOLD * camera.dark_noise + sqrtN, np.exp(-2) * particle_peak_count)
-    weakly_illuminated = particles.source_intensity * particle_peak_count <= illumination_threshold
-    # disable the particles due to weak illumination (mark only IN-FOV-particles like this!):
+    illumination_threshold = max(
+        NSIGMA_NOISE_THRESHOLD * camera.dark_noise + sqrtN,
+        1.0,
+    )
+    weakly_illuminated = in_fov & (
+        particles.source_intensity * particle_peak_count <= illumination_threshold
+    )
+    illuminated = in_fov & ~weakly_illuminated
+    # disable the particles due to weak illumination (mark only IN-FOV particles):
     particles.flag[weakly_illuminated] += ParticleFlag.OUT_OF_PLANE.value
-    particles.flag[~weakly_illuminated] += ParticleFlag.ILLUMINATED.value
+    particles.flag[illuminated] += ParticleFlag.ILLUMINATED.value
     # update the particle source intensities
     particles.source_intensity = np.multiply(particles.source_intensity, intensity_factor)
     # particles.image_max_noiseless_intensity = np.multiply(particles.source_intensity, intensity_factor)
 
-    n_too_weak = np.sum(weakly_illuminated)
+    n_too_weak = int(np.sum(weakly_illuminated))
     logger.debug(f'Particles with intensity below the noise level: {n_too_weak}')
 
     n_relevant = np.asarray(particles.flag & (ParticleFlag.IN_FOV.value + ParticleFlag.ILLUMINATED.value),

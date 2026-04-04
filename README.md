@@ -69,6 +69,12 @@ pip install .[complete]
 
 A comprehensive documentation can be found [here](https://synpivimage.readthedocs.io/en/latest/).
 
+Key pages:
+
+- [**Simulation overview**](docs/simulation_overview.rst): what the synthetic PIV workflow models end-to-end.
+- [**User controls**](docs/user_controls.rst): which parameters can be tuned (camera, laser, particles, acquisition, and output).
+- [**Model scope**](docs/model_scope.rst): what is explicitly modeled vs. simplified assumptions.
+
 ### Minimal example:
 
 ```python

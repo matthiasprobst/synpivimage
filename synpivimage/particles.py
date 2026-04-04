@@ -589,18 +589,42 @@ def model_image_particles(
         particles: Particles,
         nx: int,
         ny: int,
-        sigmax: float,
-        sigmay: float,
+        sigmax: Union[float, np.ndarray],
+        sigmay: Union[float, np.ndarray],
         fill_ratio_x: float,
         fill_ratio_y: float,
+        defocus_blur: Union[float, np.ndarray] = 0.0,
 ):
     """Model the photons irradiated by the particles on the sensor."""
     image_shape = (ny, nx)
     irrad_photons = np.zeros(image_shape)
-    delta = int(PARTICLE_INFLUENCE_FACTOR * max(sigmax, sigmay))
     max_image_photons = np.zeros_like(particles.x)
+
+    if np.isscalar(sigmax):
+        sigmax_arr = np.ones(len(particles), dtype=float) * float(sigmax)
+    else:
+        sigmax_arr = np.asarray(sigmax, dtype=float)
+    if np.isscalar(sigmay):
+        sigmay_arr = np.ones(len(particles), dtype=float) * float(sigmay)
+    else:
+        sigmay_arr = np.asarray(sigmay, dtype=float)
+
+    if sigmax_arr.shape != (len(particles),) or sigmay_arr.shape != (len(particles),):
+        raise ValueError("sigmax and sigmay must be scalar or 1D arrays matching particle count")
+
+    if np.isscalar(defocus_blur):
+        defocus_blur_arr = np.ones(len(particles), dtype=float) * float(defocus_blur)
+    else:
+        defocus_blur_arr = np.asarray(defocus_blur, dtype=float)
+
+    if defocus_blur_arr.shape != (len(particles),):
+        raise ValueError("defocus_blur must be scalar or 1D array matching particle count")
+
     for ip, (x, y, p_size, pint) in enumerate(
             zip(particles.x, particles.y, particles.size, particles.source_intensity)):
+        p_sigmax = sigmax_arr[ip]
+        p_sigmay = sigmay_arr[ip]
+        delta = int(PARTICLE_INFLUENCE_FACTOR * max(p_sigmax, p_sigmay))
         xint = int(x)
         yint = int(y)
         xmin = max(0, xint - delta)
@@ -617,11 +641,19 @@ def model_image_particles(
             xp=px,
             yp=py,
             dp=p_size,
-            sigmax=sigmax,
-            sigmay=sigmay,
+            sigmax=p_sigmax,
+            sigmay=p_sigmay,
             fill_ratio_x=fill_ratio_x,
             fill_ratio_y=fill_ratio_y,
         )
+
+        if defocus_blur_arr[ip] > 0:
+            ip_sum = Ip.sum()
+            Ip = scipy.ndimage.gaussian_filter(Ip, sigma=float(defocus_blur_arr[ip]), mode="nearest")
+            blurred_sum = Ip.sum()
+            if blurred_sum > 0:
+                Ip = Ip * (ip_sum / blurred_sum)
+
         irrad_photons[ymin:ymax, xmin:xmax] += Ip * pint
         max_image_photons[ip] = np.max(Ip * pint)
     return irrad_photons, max_image_photons
