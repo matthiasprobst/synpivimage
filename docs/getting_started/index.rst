@@ -7,6 +7,7 @@ You will learn how to:
 
 - Generate a :doc:`single synthetic Image <./SingleImage>`
 - Generate a :doc:`double synthetic Image <./DoubleImage>` by displacing the first one
+- Generate a :doc:`velocity-field-based double image <./VelocityFieldDoubleImage>` from synthetic or real velocity data
 
 Before running the notebooks, review:
 
@@ -20,6 +21,7 @@ Before running the notebooks, review:
 
     SingleImage.ipynb
     DoubleImage.ipynb
+    VelocityFieldDoubleImage.ipynb
     OutOfPlane.ipynb
     Laser.ipynb
     Camera.ipynb
